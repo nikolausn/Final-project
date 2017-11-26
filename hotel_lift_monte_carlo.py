@@ -385,20 +385,20 @@ class Lift(CapacityLimit):
         Lift is called to particular floor,
         append the floor to the stop list
         """
-        if floor not in self._call_floor:
-            if self._status == "idle":
-                # check which direction the lift should move
-                path = nx.shortest_path(self._graph, self._position, floor)
-                self._status = self._graph.edge[path[0]][path[1]]["attr"]["dir"]
+        if self._status == "idle":
+            # check which direction the lift should move
+            path = nx.shortest_path(self._graph, self._position, floor)
+            self._status = self._graph.edge[path[0]][path[1]]["attr"]["dir"]
 
-                self._call_imediate = floor
-                self._next_move = direction
+            self._call_imediate = floor
+            self._next_move = direction
 
-                if self._status == "up":
-                    self.go_up()
-                else:
-                    self.go_down()
+            if self._status == "up":
+                self.go_up()
             else:
+                self.go_down()
+        else:
+            if floor not in self._call_floor:
                 if self._call_imediate == "":
                     if self._status == direction and self._next_move=="":
                         self._call_floor.append(floor)
@@ -487,7 +487,6 @@ class Lift(CapacityLimit):
             if self._door_open:
                 logging.debug("Lift {} arrive on {}, closing door in {}".format(self.name, self.position, self._timer))
                 # pick up attendance
-
             else:
                 logging.debug("Lift {} go {} from {} to {} arrive in {}".format(self.name, self._status, self._position,
                                                                                 self._target, self._timer))
@@ -560,10 +559,13 @@ class HotelLift():
         Method to pick up attendance
         :return:
         """
+
+        """
         for floor in self.floors:
             logging.debug("Floor: {}".format(floor.floor_name))
             logging.debug("Queue down: {}".format(len(floor.lift_queue_down)))
             logging.debug("Queue up: {}".format(len(floor.lift_queue_up)))
+        """
 
         for lift in self.lifts.values():
             logging.debug("Drop Pick Up: {}, status: {}".format(lift,lift._status))
@@ -573,8 +575,8 @@ class HotelLift():
             for attend in copy_attendance:
                 if attend._target_floor == lift._position:
                     lift.pop_attendance(attend)
-                    attend._target_floor = ""
-                    attend._from_floor = ""
+                    #attend._target_floor = ""
+                    #attend._from_floor = ""
                     attend.position = attend._moving_path[0]
 
             if lift._door_open:
@@ -638,6 +640,7 @@ class HotelLiftQueue():
         lift_path = [x for x in range(len(self.hotel_lift.floors) * 2)]
         lift_call = None
         direction = None
+
         for lift in self.hotel_lift.lifts.values():
             try:
                 path = nx.shortest_path(lift._graph, floor, target)
@@ -649,7 +652,7 @@ class HotelLiftQueue():
                     if len(lift_path) > len(lift_to_pos_dir):
                         lift_path = lift_to_pos_dir
                         lift_call = lift
-                elif lift_to_pos_dir == lift._status:
+                elif lift_to_pos_dir == lift._status and lift._door_open:
                     if len(lift_path) > len(lift_to_pos_dir):
                         lift_path = lift_to_pos_dir
                         lift_call = lift
@@ -657,6 +660,13 @@ class HotelLiftQueue():
                     lift.call(floor, direction)
             except BaseException as ex:
                 path = []
+
+        if direction == "up":
+            if att not in self.hotel_lift.floors[floor].lift_queue_up:
+                self.hotel_lift.floors[floor].lift_queue_up.append(att)
+        elif direction == "down":
+            if att not in self.hotel_lift.floors[floor].lift_queue_down:
+                self.hotel_lift.floors[floor].lift_queue_down.append(att)
 
         return (lift_call, lift_path, direction)
         """
@@ -716,6 +726,8 @@ class Attendance(Person):
         self._random_outside_time = GaussianDist(mu=outside_time, sigma=outside_time / 2, low=0, high=outside_time * 2)
         self._next_move = 0
         self._random_generator = random_generator
+        self._waiting_lift_time = 0
+        self._in_lift_time = 0
 
         """
         status for a person is
@@ -779,6 +791,14 @@ class Attendance(Person):
 
         if self._action == self._target:
             self._position = self._moving_path.pop(0)
+            total_time = self._waiting_lift_time + self._in_lift_time
+            with open("result.txt","a") as file:
+                file.write(",".join([str(x) for x in [self.name,self._from_floor,self._target_floor,self._waiting_lift_time,self._in_lift_time,total_time]])+"\n")
+
+            self._target_floor = ""
+            self._from_floor = ""
+            self._waiting_lift_time = 0
+            self._in_lift_time = 0
 
         if self._action == "waiting_lift":
             """
@@ -797,17 +817,20 @@ class Attendance(Person):
             self._from_floor = from_where
             self._target_floor = to_where
 
-            #logging.debug("Person {}, from {} to {}".format(self._name,self._position,to_where))
+            if from_where!=to_where:
+                # call lift only if the attendance go to another floor
+                #logging.debug("Person {}, from {} to {}".format(self._name,self._position,to_where))
+                lift, path, direction = self._lift_queue.call_lift(self, from_where, to_where)
+                #logging.debug("Person {}, call lift {}, path: {}".format(self._name, lift, path))
 
-            lift, path, direction = self._lift_queue.call_lift(self, from_where, to_where)
-            #logging.debug("Person {}, call lift {}, path: {}".format(self._name, lift, path))
+                if direction == "up":
+                    if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_up:
+                        self._lift_queue.hotel_lift.floors[from_where].lift_queue_up.append(self)
+                elif direction == "down":
+                    if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_down:
+                        self._lift_queue.hotel_lift.floors[from_where].lift_queue_down.append(self)
 
-            if direction == "up":
-                if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_up:
-                    self._lift_queue.hotel_lift.floors[from_where].lift_queue_up.append(self)
-            elif direction == "down":
-                if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_down:
-                    self._lift_queue.hotel_lift.floors[from_where].lift_queue_down.append(self)
+            self._waiting_lift_time+=1
 
             """
             # check if there is a lift available for the attendance
@@ -818,6 +841,8 @@ class Attendance(Person):
                         lift.add_attendance()
             """
 
+        if self._action == "in_lift":
+            self._in_lift_time += 1
 
         if self._next_move > 0:
             self._next_move -= 1
