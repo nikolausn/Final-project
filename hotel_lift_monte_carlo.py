@@ -264,7 +264,7 @@ class Lift(CapacityLimit):
         # it should use skewed distribution
         # This will effect the lift door closing time
 
-        self._random_gauss = GaussianDist(mu=self.max_waiting_time / 2, sigma=5, low=1, high=self.max_waiting_time)
+        self._random_gauss = GaussianDist(mu=self.max_waiting_time / 2, sigma=5, low=2, high=self.max_waiting_time)
 
         self._random_generator = random_generator
 
@@ -428,9 +428,11 @@ class Lift(CapacityLimit):
         perform waiting time generator
         """
         if self._timer == 0:
+            # if there is no stop call
+
             if self._door_open:
                 self._door_open = False
-            # if there is no stop call
+
             if len(self._stop_floor) == 0 and len(self._call_floor) == 0 and self._call_imediate=="":
                 self._status = "idle"
             elif self._call_imediate != "":
@@ -466,6 +468,12 @@ class Lift(CapacityLimit):
                 self._position = self._target
                 # logging.debug("Position Move {}".format(self.position))
 
+            if len(self.graph.edge[self._position]) == 1:
+                if len(self._stop_floor) > 0:
+                    if self._status == "down":
+                        self._status = "up"
+                    elif self._status == "up":
+                        self._status = "down"
 
             """
             move the lift
@@ -559,15 +567,17 @@ class HotelLift():
 
         for lift in self.lifts.values():
             logging.debug("Drop Pick Up: {}, status: {}".format(lift,lift._status))
-            if lift._door_open:
-                # drop people that come out
-                for attend in lift._attendance:
-                    if attend._target_floor == lift._position:
-                        lift.pop_attendance(attend)
-                        attend._target_floor = ""
-                        attend._from_floor = ""
-                        attend.position = attend._moving_path[0]
+            logging.debug("Lift: {}, attendance floor: {}".format(lift.name,[x._target_floor for x in lift._attendance]))
+            # drop people that come out
+            copy_attendance = lift._attendance.copy()
+            for attend in copy_attendance:
+                if attend._target_floor == lift._position:
+                    lift.pop_attendance(attend)
+                    attend._target_floor = ""
+                    attend._from_floor = ""
+                    attend.position = attend._moving_path[0]
 
+            if lift._door_open:
                 # check people that come in
                 if lift._status == "down":
                     lift_queue = self.floors[lift._position].lift_queue_down
@@ -577,10 +587,11 @@ class HotelLift():
                             # if total attendance equal with capacity
                             # then the lift must not accepting any more attendance
                             break
-                        if attend.capacity_unit + lift.attendance <= lift.capacity:
-                            lift.add_attendance(attend)
-                            attend.position = "waiting_lift"
-                            lift_queue.remove(attend)
+                        if attend._target_floor in lift.served_floor:
+                            if attend.capacity_unit + lift.attendance <= lift.capacity:
+                                lift.add_attendance(attend)
+                                attend.position = "waiting_lift"
+                                lift_queue.remove(attend)
                 elif lift._status == "up":
                     lift_queue = self.floors[lift._position].lift_queue_up
                     #while lift.attendance < lift.capacity or len(lift_queue)>0 :
@@ -589,10 +600,11 @@ class HotelLift():
                             # if total attendance equal with capacity
                             # then the lift must not accepting any more attendance
                             break
-                        if attend.capacity_unit + lift.attendance <= lift.capacity:
-                            lift.add_attendance(attend)
-                            attend.position = "waiting_lift"
-                            lift_queue.remove(attend)
+                        if attend._target_floor in lift.served_floor:
+                            if attend.capacity_unit + lift.attendance <= lift.capacity:
+                                lift.add_attendance(attend)
+                                attend.position = "waiting_lift"
+                                lift_queue.remove(attend)
 
     def __repr__(self):
         output = ""
@@ -922,13 +934,14 @@ class SimulationHelper():
     def simulate_timer(self):
         # move all the object
         # logging.debug(self._attendance)
+        for lift in self._lifts.values():
+            lift.perform_move()
+
         self._hotel_lift.drop_pick_up_attendance()
 
         for attendance in self._attendance:
             attendance.perform_move()
 
-        for lift in self._lifts.values():
-            lift.perform_move()
 
     def run_simulation(self):
         while self._status == "start":
