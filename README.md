@@ -50,6 +50,7 @@ There are several variables I used for the uncertainty:
 ## Instructions on how to use the program:
 To use the program we can just run the script hotel_lift_monte_carlo.py and it will run the simulation using the parameter in the code (for now, and might be stored in a config file later). The program itself run in a thread, and right now it will run forever until you pause the program using Command button (in mac), or push a control-C to stop the code. The program will produce a statistic file named results.txt which is described as this example
 
+```
 AttendanceName,FromFloor,ToFloor,WaitingTime,InLiftTime,TotalSpendTime
 984,17,0,40,38,78
 1051,17,0,14,38,52
@@ -57,6 +58,7 @@ AttendanceName,FromFloor,ToFloor,WaitingTime,InLiftTime,TotalSpendTime
 1136,14,0,72,29,101
 1154,14,0,32,29,61
 1248,14,0,1,24,25
+```
 
 The summary statistics function will be deployed later
 
