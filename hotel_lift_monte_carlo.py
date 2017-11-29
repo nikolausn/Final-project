@@ -17,7 +17,7 @@ number_of_floor = 20
 conference_room_floor = 2
 
 
-# define the class person
+# define the class Person, Attendance, and Room for name requirement
 # implementation later
 class Person:
     pass
@@ -34,6 +34,8 @@ class RandomMovementGenerator():
     initiate random movement for target object
     since generating random in the object will
     result in the same value (same seed)
+    This class should be a singleton, but I think we don't need to use this since we add
+    the implementation in the object level
     """
 
     def __init__(self, person, lift):
@@ -56,6 +58,10 @@ class RandomMovementGenerator():
 
 
 class RoomType:
+    """
+    RoomType is a base class of a room class,
+    this class contains name and capacity to determine how many people can a room handle
+    """
     def __init__(self, name_type: str, capacity: int):
         self._name_type = name_type
         self._capacity = capacity
@@ -70,6 +76,11 @@ class RoomType:
 
 
 class RandomDist():
+    """
+    RandomDist is a base abstract class to build a Random distribution.
+    This class contains an abstract method for building a random generator
+    Inherited class must implement this method
+    """
     def __init__(self, name):
         self._name = name
 
@@ -78,11 +89,27 @@ class RandomDist():
         return self._name
 
     def random(self):
-        None
+        """
+        This class is an abstract method for implementation class
+        should return a random value based on the configuration given in the implementation
+        :return:
+        """
+        pass
 
 
 class GaussianDist(RandomDist):
+    """
+    A random Gaussian Distribution generator
+    """
     def __init__(self, mu: float, sigma: float, low: float, high: float):
+        """
+        To use this class we must provide mu (mean), sigma (standard deviation), low value, and high value
+
+        :param mu: mean, in which the normal gaussian will have most distribution
+        :param sigma: a standard deviation for a random gaussian parameter
+        :param low: the lowest value this random generator must provide
+        :param high: the highest value this random generator must provide
+        """
         RandomDist.__init__(self, "Gaussian")
         self._mu = mu
         self._sigma = sigma
@@ -90,29 +117,47 @@ class GaussianDist(RandomDist):
         self._high = high
 
     def random(self):
+        """
+        This will return a random gaussian generator by checking the low value and highest value
+        :return:
+        """
         x = self._low - 1
         while x < self._low or x > self._high:
             x = random.gauss(self._mu, self._sigma)
         return x
 
 
-class GaussianDiscrete(RandomDist):
+class GaussianDiscrete(GaussianDist):
+    """
+    A random Gaussian Discrete generator
+    This will include all the feature that gaussian has but will return a discrete value using round
+    """
     def __init__(self, mu: float, sigma: float, low: float, high: float):
+        """
+               To use this class we must provide mu (mean), sigma (standard deviation), low value, and high value
+
+               :param mu: mean, in which the normal gaussian will have most distribution
+               :param sigma: a standard deviation for a random gaussian parameter
+               :param low: the lowest value this random generator must provide
+               :param high: the highest value this random generator must provide
+               """
+        GaussianDist.__init__(self, mu, sigma, low, high)
         RandomDist.__init__(self, "GaussianDiscrete")
-        self._mu = mu
-        self._sigma = sigma
-        self._low = low
-        self._high = high
 
     def random(self):
-        x = self._low - 1
-        while x < self._low or x > self._high:
-            x = round(random.gauss(self._mu, self._sigma))
-        return x
+        return round(GaussianDist.random(self))
 
 
 class CapacityLimit:
+    """
+    A base class for defining classes that has capacity
+    like Floor, Lift, Room
+    """
     def __init__(self, capacity=0):
+        """
+        determine the capacity in the initialization
+        :param capacity: capacity limit of the class
+        """
         self._capacity = capacity
 
     @property
@@ -121,12 +166,25 @@ class CapacityLimit:
 
 
 class Floor(CapacityLimit):
+    """
+    Floor is a base class for determining a hotel floor
+    It is also inherited from the CapacityLimit
+    """
     def __init__(self, capacity=0):
         CapacityLimit.__init__(self, capacity)
 
 
 class HotelFloor(Floor):
+    """
+    HotelFloor is a class for determining a hotel floor
+    """
     def __init__(self, floor_name: str, rooms_floor_count: dict, room_types: dict):
+        """
+
+        :param floor_name:
+        :param rooms_floor_count:
+        :param room_types:
+        """
         self._rooms = {}
         number = 1
         self._floor_name = floor_name
