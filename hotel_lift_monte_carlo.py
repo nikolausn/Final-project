@@ -180,10 +180,13 @@ class HotelFloor(Floor):
     """
     def __init__(self, floor_name: str, rooms_floor_count: dict, room_types: dict):
         """
+        Initialize the hotel floor, you must define the floor name, floor rooms
+        and room types.
 
-        :param floor_name:
-        :param rooms_floor_count:
-        :param room_types:
+        :param floor_name: name of the floor
+        :param rooms_floor_count: To customize the floor the rooms_floor_count will be a dictionary
+        containgin the numbe of rooms and their types
+        :param room_types: dictionary of the room types detail
         """
         self._rooms = {}
         number = 1
@@ -210,6 +213,10 @@ class HotelFloor(Floor):
 
     @property
     def rooms(self)->typing.List[Room]:
+        """
+
+        :return: list of rooms in the floor
+        """
         return self._rooms
 
     @property
@@ -218,10 +225,18 @@ class HotelFloor(Floor):
 
     @property
     def lift_queue_up(self)->typing.List[Attendance]:
+        """
+
+        :return: the queue of guests that calling the lift to go up
+        """
         return self._lift_queue_up
 
     @property
     def lift_queue_down(self)->typing.List[Attendance]:
+        """
+
+        :return: the queue of guests that calling the lift to go down
+        """
         return self._lift_queue_down
 
     def __repr__(self):
@@ -229,6 +244,11 @@ class HotelFloor(Floor):
 
 
 class Room(RoomType):
+    """
+    Class of Room, inherited from the RoomType class
+    will include the HotelFloor object
+    """
+
     """
     def __init__(self,number: str,room_type: RoomType):
         self._room_type = room_type
@@ -240,6 +260,13 @@ class Room(RoomType):
     """
 
     def __init__(self, number: str, name: str, capacity: int, floor: HotelFloor):
+        """
+        Define the room number, room type name, capacity and designated floor
+        :param number: room number
+        :param name: room type name
+        :param capacity: capacity of the Room
+        :param floor: HotelFloor object where the room exists
+        """
         RoomType.__init__(self, name, capacity)
         self._number = number
         self._occupied = False
@@ -248,6 +275,10 @@ class Room(RoomType):
 
     @property
     def floor(self):
+        """
+
+        :return: the designated floor
+        """
         return self._floor
 
     @property
@@ -266,6 +297,10 @@ class Room(RoomType):
 
     @property
     def attendance(self):
+        """
+
+        :return: List of attendance that checked in to this room
+        """
         return self._attendance
 
     @property
@@ -274,15 +309,31 @@ class Room(RoomType):
 
     @property
     def occupied_status(self):
+        """
+
+        :return: will return "occupied" if it is occupied or "empty" if it isn't
+        """
         return "occupied" if self.occupied else "empty"
 
     def attendance_checkin(self, person: Person):
+        """
+        Method to add attendance to this room
+        person will be added to the List of attendance
+        :param person: Attendance
+        :return: None
+        """
         self.attendance.append(person)
         # There is a person checkin, set occupancy status of this room into True
         if self.attendance_number > 0:
             self._occupied = True
 
     def attendance_checkout(self, person: Person):
+        """
+        Method to checkout the Attendance
+        List of attendance will be poped out
+        :param person: Attendance
+        :return: None
+        """
         self.attendance.remove(person)
         # if attendance number is zero than the room is empty
         if self.attendance_number == 0:
@@ -294,17 +345,30 @@ class Room(RoomType):
 
 
 class Lift(CapacityLimit):
+    """
+    Lift class that describing the properties of lift and every method the lift has
+    """
     _status_list = ["go_up", "go_down", "idle"]
 
     def __init__(self, name: str, random_generator: RandomMovementGenerator, average_speed: int = 1,
                  floor_configuration: dict = {}, capacity: int = 0, position: int = 0,
                  max_waiting_time: int = 10):
+        """
+
+        :param name:
+        :param random_generator: we might not used this
+        :param average_speed: this is not used
+        :param floor_configuration: configuration of a floor in dictionary
+        :param capacity: capacity of a lift
+        :param position: position of the lift
+        :param max_waiting_time: maximum waiting time for a door to close
+        """
         CapacityLimit.__init__(self, capacity)
         self._name = name
         self._position = position
         self._graph = nx.DiGraph()
         self._attendance_number = 0
-        self._max_waiting_time = 10
+        self._max_waiting_time = max_waiting_time
         self._timer = 0
         self._attendance:typing.List[Attendance] = []
 
@@ -321,7 +385,6 @@ class Lift(CapacityLimit):
         # Random distribution for maximum waiting time
         # it should use skewed distribution
         # This will effect the lift door closing time
-
         self._random_gauss = GaussianDist(mu=self.max_waiting_time / 2, sigma=5, low=2, high=self.max_waiting_time)
 
         self._random_generator = random_generator
@@ -350,6 +413,7 @@ class Lift(CapacityLimit):
     def gen_close_door(self) -> int:
         """
         Generate close door for simulation
+        :return: random gaussian of the closing door based on maximum waiting time
         """
         self._door_open = True
         return math.ceil(self._random_gauss.random())
@@ -384,6 +448,12 @@ class Lift(CapacityLimit):
 
     @attendance.setter
     def attendance(self, new_att: int):
+        """
+        attendance_number setter
+        if it greaters than the maximum capacity it will be rejected
+        :param new_att: number of attendance to be added to the _attendance_number property
+        :return: None
+        """
         if new_att > self.capacity:
             raise Exception("Attendance reach it's maximum capacity: {}".format(self.capacity))
         if new_att < 0:
@@ -395,16 +465,34 @@ class Lift(CapacityLimit):
         self._attendance_number = new_att
 
     def add_attendance(self, new_att: Attendance):
+        """
+        Method to add attendance object to the lift
+        This will append the attendance to the _attendance list
+        After it is added, the lift will be asked to stop to the attendance target floor
+        :param new_att: Attendance object, that want to use the lift
+        :return: None
+        """
         self.attendance += new_att.capacity_unit
         self._attendance.append(new_att)
         new_att.position="waiting_lift"
         self.goto(new_att._target_floor)
 
     def pop_attendance(self, drop_att: Attendance):
+        """
+        Method to remove the attendance from lift
+        If the attendance arrived in the target floor
+        :param drop_att: attendance to be dropped
+        :return: None
+        """
         self._attendance.remove(drop_att)
         self.attendance -= drop_att.capacity_unit
 
     def go_up(self):
+        """
+        Ask the lift to go_up
+        :return: target floor
+        """
+
         """
         edge = self.graph.edge[self.position]
         for target_node in edge:
@@ -425,6 +513,11 @@ class Lift(CapacityLimit):
 
     def go_down(self):
         """
+        Ask the lift to go down
+        :return: target_floor
+        """
+
+        """
         edge = self.graph.edge[self.position]
         for target_node in edge:
             if edge[target_node]["attr"]["dir"] == "down":
@@ -442,7 +535,12 @@ class Lift(CapacityLimit):
         """
         Lift is called to particular floor,
         append the floor to the stop list
+
+        :param floor: from where
+        :param direction: to where
+        :return: None
         """
+
         if self._status == "idle":
             # check which direction the lift should move
             path = nx.shortest_path(self._graph, self._position, floor)
@@ -472,7 +570,11 @@ class Lift(CapacityLimit):
         """
         Same operation with call, just to make variance statement
         between calling and pushing the button inside lift
+
+        :param floor: which floor the lift want to go to
+        :return: None
         """
+
         if floor not in self._stop_floor:
             if self._status == "idle":
                 # check which direction the lift should move
@@ -484,7 +586,10 @@ class Lift(CapacityLimit):
         """
         check the stop_floor, if the lift is called to stop at that floor,
         perform waiting time generator
+
+        :return:
         """
+
         if self._timer == 0:
             # if there is no stop call
 
@@ -563,8 +668,22 @@ class Lift(CapacityLimit):
 
 
 class HotelLift():
+    """
+    HotelLift
+    is a class that combining the HotelFloor and the Lift, it also can be called as a simple hotel class
+    """
     def __init__(self, number_of_floor: int, number_of_lift: int, rooms_floor_count, room_types: dict,
                  random_generator: RandomMovementGenerator):
+        """
+        give number of floor, room_types, and rooms_floor_count configuration
+        The class will generate all the Object needed based on configuration
+
+        :param number_of_floor: number of floor
+        :param number_of_lift: number of lift
+        :param rooms_floor_count: configuration for rooms in a floor
+        :param room_types: configuration of room types
+        :param random_generator: might not be used
+        """
         self._floors = []
         self._rooms = []
         self._total_capacity = 0
@@ -614,8 +733,9 @@ class HotelLift():
 
     def drop_pick_up_attendance(self):
         """
-        Method to pick up attendance
-        :return:
+        Method to drop or pick up attendance
+
+        :return: None
         """
 
         """
@@ -674,7 +794,15 @@ class HotelLift():
 
 
 class HotelLiftQueue():
+    """
+    Helper class for a lift queue
+    """
     def __init__(self, hotel_lift: HotelLift):
+        """
+        give the HotelLift object
+
+        :param hotel_lift: HotelLift Object
+        """
         self._hotel_lift = hotel_lift
         self._hotel_floor = hotel_lift.floors
 
@@ -734,8 +862,23 @@ class HotelLiftQueue():
 
 
 class Person():
+    """
+    Base class for the Attendance
+    """
     def __init__(self, name: str, move_time: int, outside_time: int, random_generator: RandomMovementGenerator,
                  schedule={}, capacity_unit=1):
+        """
+        Define the attendance name and capacity unit of attendance
+        Different person might have different capacity unit to further
+        realize the different capacity scenario
+
+        :param name:
+        :param move_time: might not be used
+        :param outside_time: might not be used
+        :param random_generator: might not be used
+        :param schedule: might not be used
+        :param capacity_unit:
+        """
         self._name = name
         self._capacity_unit = capacity_unit
 
@@ -749,6 +892,10 @@ class Person():
 
 
 class Attendance(Person):
+    """
+    Attendance of the hotel
+    This class will have all methods that can be performed for one attendance
+    """
     _target_dest = ["room", "outside", "conference", "dining"]
     _status = ["idle", "go_lift", "waiting_lift", "in_lift", "on_move"]
 
@@ -772,6 +919,18 @@ class Attendance(Person):
     def __init__(self, room: Room, name: str, move_time: int, outside_time: int,
                  random_generator: RandomMovementGenerator, lift_queue: HotelLiftQueue, schedule: dict = {},
                  capacity_unit: int = 1):
+        """
+
+        :param room: room object the attendance assigned for
+        :param name: attendance name
+        :param move_time: attendance moving time
+        :param outside_time: attendance outside time
+        :param random_generator: might not be used
+        :param lift_queue: if the attendance assigned in one lift queue
+        :param schedule: schedule of the attendance
+        :param capacity_unit: capacity unit of an attendance, higher capacity unit will reflect on
+        how the attendance occupied the lift
+        """
         Person.__init__(self, name, move_time=move_time, outside_time=outside_time, capacity_unit=capacity_unit,
                         schedule=schedule, random_generator=random_generator)
         self._room = room
@@ -831,6 +990,8 @@ class Attendance(Person):
         every time this function called, moving time will be reduced
         and if it's reach zero it will perform the moving
         action
+
+        :return:
         """
 
         #logging.debug(self._moving_path)
@@ -924,6 +1085,11 @@ class Attendance(Person):
         return self._action
 
     def generate_next_move(self):
+        """
+        Method to generate next move for the attendance
+        might include the move that are assigned in the schedule
+        :return:
+        """
         if self._position == "room":
             self._next_move = round(self._random_move_time.random())
             # self._next_move = self._random_generator.random_move_time()
@@ -940,6 +1106,9 @@ class Attendance(Person):
 
 
 class InitialGenerator():
+    """
+    InitialGenerator is a class to generate random attendance
+    """
     def __init__(self, room_stack: list, room_occupancy_pctg: float, move_time: int, outside_time: int,
                  random_generator: RandomMovementGenerator, lift_queue: HotelLiftQueue):
         # sample room_stack based on occupancy percentage
@@ -979,6 +1148,9 @@ class InitialGenerator():
 
 
 class SimulationHelper():
+    """
+    SimulationHelper is a class that run the simulation in a Thread
+    """
     def __init__(self, attendance: list, hotel_lift: HotelLift, interval: float = 1):
         self._attendance = attendance
         self._hotel_lift = hotel_lift
