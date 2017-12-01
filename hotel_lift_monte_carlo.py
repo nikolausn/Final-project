@@ -541,18 +541,22 @@ class Lift(CapacityLimit):
         :return: None
         """
 
-        if self._status == "idle":
+        if self._status == "idle" and self.attendance == 0:
             # check which direction the lift should move
-            path = nx.shortest_path(self._graph, self._position, floor)
-            self._status = self._graph.edge[path[0]][path[1]]["attr"]["dir"]
+            try:
+                path = nx.shortest_path(self._graph, self._position, floor)
 
-            self._call_imediate = floor
-            self._next_move = direction
+                self._status = self._graph.edge[path[0]][path[1]]["attr"]["dir"]
 
-            if self._status == "up":
-                self.go_up()
-            else:
-                self.go_down()
+                self._call_imediate = floor
+                self._next_move = direction
+
+                if self._status == "up":
+                    self.go_up()
+                else:
+                    self.go_down()
+            except BaseException as ex:
+                None
         else:
             if floor not in self._call_floor:
                 if self._call_imediate == "":
@@ -611,25 +615,29 @@ class Lift(CapacityLimit):
                     self._call_floor.clear()
                     self._status = "idle"
 
-                if self._position in self._stop_floor:
-                    # remove the position from the stop floor
-                    self._stop_floor.remove(self._position)
-                    if self._position in self._call_floor:
-                        self._call_floor.remove(self._position)
-                    # perform additional waiting time
-                    self._timer += self.gen_close_door()
-
-                    # logging.debug("Lift {} arrive on {}, closing door in {}".format(self.name,self.position,self._timer))
+            if self._position in self._stop_floor:
+                # remove the position from the stop floor
+                print("position: {}".format(self._position))
+                self._stop_floor.remove(self._position)
                 if self._position in self._call_floor:
                     self._call_floor.remove(self._position)
-                    if self.attendance < self.capacity:
-                        self._timer += self.gen_close_door()
-                        # logging.debug("Lift {} arrive on {}, closing door in {}".format(self.name,self.position,self._timer))
+                # perform additional waiting time
+                self._timer += self.gen_close_door()
 
-            if self._status != "idle":
+                # logging.debug("Lift {} arrive on {}, closing door in {}".format(self.name,self.position,self._timer))
+            if self._position in self._call_floor:
+                self._call_floor.remove(self._position)
+                if self.attendance < self.capacity:
+                    self._timer += self.gen_close_door()
+                    # logging.debug("Lift {} arrive on {}, closing door in {}".format(self.name,self.position,self._timer))
+
+            #if self._status != "idle":
                 # logging.debug("Position Move {} Target {}".format(self.position,self._target))
-                self._position = self._target
+            #    self._position = self._target
                 # logging.debug("Position Move {}".format(self.position))
+
+            if self._target!="":
+                self._position = self._target
 
             if len(self.graph.edge[self._position]) == 1:
                 if len(self._stop_floor) > 0:
@@ -738,12 +746,12 @@ class HotelLift():
         :return: None
         """
 
-        """
+
         for floor in self.floors:
             logging.debug("Floor: {}".format(floor.floor_name))
             logging.debug("Queue down: {}".format(len(floor.lift_queue_down)))
             logging.debug("Queue up: {}".format(len(floor.lift_queue_up)))
-        """
+
 
         for lift in self.lifts.values():
             logging.debug("Drop Pick Up: {}, status: {}".format(lift,lift._status))
@@ -860,6 +868,161 @@ class HotelLiftQueue():
             if lift._status == "idle":
         """
 
+    def call_lift_priority(self,att:Attendance,floor:str,target:str):
+        """
+        Call the lift using the priority queue in each floor
+        :param att:
+        :param floor:
+        :param target:
+        :return:
+        """
+        lift_path = [x for x in range(len(self.hotel_lift.floors) * 2)]
+        lift_call = None
+        direction = None
+
+        for lift in self.hotel_lift.lifts.values():
+            try:
+                path = nx.shortest_path(lift._graph, floor, target)
+                direction = lift._graph.edge[path[0]][path[1]]["attr"]["dir"]
+                break;
+            except BaseException as ex:
+                path = []
+
+        # add the attendance to the lift queue
+        if direction == "up":
+            if att not in self.hotel_lift.floors[floor].lift_queue_up:
+                self.hotel_lift.floors[floor].lift_queue_up.append(att)
+        elif direction == "down":
+            if att not in self.hotel_lift.floors[floor].lift_queue_down:
+                self.hotel_lift.floors[floor].lift_queue_down.append(att)
+
+    def move_immediate(self):
+        # check the busiest floor
+        #busy_up = None
+        #busy_down = None
+
+        #len_busy_up = 0
+        #len_busy_down = 0
+
+        #make a list of tuple queue
+        busy_queue_up = []
+        busy_queue_down = []
+
+        for floor in self.hotel_lift.floors:
+            busy_queue_up.append((floor,len(floor.lift_queue_up)))
+            busy_queue_down.append((floor, len(floor.lift_queue_down)))
+            """
+            if len(floor.lift_queue_up) > len_busy_up:
+                len_busy_up = len(floor.lift_queue_up)
+                busy_up = floor
+            if len(floor.lift_queue_down) > len_busy_down:
+                len_busy_down = len(floor.lift_queue_down)
+                busy_down = floor
+            """
+
+        # sort the busy queue based on the attendance
+        busy_queue_up = sorted(busy_queue_up,key=lambda x: x[1])[::-1]
+        busy_queue_down = sorted(busy_queue_down,key=lambda x: x[1])[::-1]
+
+
+        for queue_tuple in busy_queue_up:
+            floor = queue_tuple[0]
+            lift_path_up = [x for x in range(len(self.hotel_lift.floors) * 2)]
+            #lift_path_down = [x for x in range(len(self.hotel_lift.floors) * 2)]
+            direction = None
+            lift_call_up = None
+            #lift_call_down = None
+            for lift in self.hotel_lift.lifts.values():
+                try:
+                    lift_to_pos = nx.shortest_path(lift._graph, lift._position, floor.floor_name)
+                    #print(lift_to_pos)
+                    #if len(lift_to_pos) > 1:
+                    lift_to_pos_up = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
+                    """
+                    if busy_down!=None:
+                        lift_to_pos = nx.shortest_path(lift._graph, lift._position, busy_down.floor_name)
+                        #if len(lift_to_pos) > 1:
+                        lift_to_pos_down = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
+                    """
+
+                    if lift._status == "idle":
+                        if len(lift_path_up) > len(lift_to_pos):
+                            lift_path_up = lift_to_pos
+                            lift_call_up = lift
+                    elif "up" == lift._status and lift_to_pos_up==lift._status and not lift._door_open:
+                        if len(lift_path_up) > len(lift_to_pos):
+                            lift_path_up = lift_to_pos
+                            lift_call_up = lift
+
+                    """
+                    if busy_down!=None:
+                        if lift._status == "idle":
+                            if len(lift_path_down) > len(lift_to_pos_down):
+                                lift_path_down = lift_to_pos_down
+                                lift_call_down = lift
+                        elif lift_to_pos_down == lift._status:
+                            if len(lift_path_down) > len(lift_to_pos_down):
+                                lift_path_down = lift_to_pos_down
+                                lift_call_down = lift
+                    """
+                except BaseException as ex:
+                    #print(ex)
+                    pass
+
+            #print(lift_call_up)
+            if lift_call_up != None:
+                lift_call_up.call(floor.floor_name, "up")
+
+
+        for queue_tuple in busy_queue_down:
+            floor = queue_tuple[0]
+            lift_path_up = [x for x in range(len(self.hotel_lift.floors) * 2)]
+            # lift_path_down = [x for x in range(len(self.hotel_lift.floors) * 2)]
+            direction = None
+            lift_call_up = None
+            # lift_call_down = None
+            for lift in self.hotel_lift.lifts.values():
+                try:
+                    lift_to_pos = nx.shortest_path(lift._graph, lift._position, floor.floor_name)
+                    #print(lift_to_pos)
+                    # if len(lift_to_pos) > 1:
+                    lift_to_pos_up = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
+                    """
+                    if busy_down!=None:
+                        lift_to_pos = nx.shortest_path(lift._graph, lift._position, busy_down.floor_name)
+                        #if len(lift_to_pos) > 1:
+                        lift_to_pos_down = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
+                    """
+
+                    if lift._status == "idle":
+                        if len(lift_path_up) > len(lift_to_pos):
+                            lift_path_up = lift_to_pos
+                            lift_call_up = lift
+                    elif "down" == lift._status and lift_to_pos_up == lift._status and not lift._door_open:
+                        if len(lift_path_up) > len(lift_to_pos):
+                            lift_path_up = lift_to_pos
+                            lift_call_up = lift
+
+                    """
+                    if busy_down!=None:
+                        if lift._status == "idle":
+                            if len(lift_path_down) > len(lift_to_pos_down):
+                                lift_path_down = lift_to_pos_down
+                                lift_call_down = lift
+                        elif lift_to_pos_down == lift._status:
+                            if len(lift_path_down) > len(lift_to_pos_down):
+                                lift_path_down = lift_to_pos_down
+                                lift_call_down = lift
+                    """
+                except BaseException as ex:
+                    #print(ex)
+                    pass
+
+            #print(lift_call_up)
+            if lift_call_up != None:
+                lift_call_up.call(floor.floor_name, "down")
+
+
 
 class Person():
     """
@@ -967,7 +1130,7 @@ class Attendance(Person):
         self._room = room
 
     def call_lift(self):
-        lift_queue.call_lift(self._position, self._target)
+        lift_queue.call_lift_priority(self._position, self._target)
 
     def go_lift(self):
         lift_queue.go_lift(self._target)
@@ -1039,16 +1202,19 @@ class Attendance(Person):
             if from_where!=to_where:
                 # call lift only if the attendance go to another floor
                 #logging.debug("Person {}, from {} to {}".format(self._name,self._position,to_where))
-                lift, path, direction = self._lift_queue.call_lift(self, from_where, to_where)
+                #lift, path, direction = self._lift_queue.call_lift_priority(self, from_where, to_where)
                 #logging.debug("Person {}, call lift {}, path: {}".format(self._name, lift, path))
 
+                self._lift_queue.call_lift_priority(self, from_where, to_where)
+
+                """
                 if direction == "up":
                     if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_up:
                         self._lift_queue.hotel_lift.floors[from_where].lift_queue_up.append(self)
                 elif direction == "down":
                     if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_down:
                         self._lift_queue.hotel_lift.floors[from_where].lift_queue_down.append(self)
-
+                """
             self._waiting_lift_time+=1
 
             """
@@ -1151,12 +1317,13 @@ class SimulationHelper():
     """
     SimulationHelper is a class that run the simulation in a Thread
     """
-    def __init__(self, attendance: list, hotel_lift: HotelLift, interval: float = 1):
+    def __init__(self, attendance: list, hotel_lift: HotelLift, lift_queue: HotelLiftQueue,interval: float = 1):
         self._attendance = attendance
         self._hotel_lift = hotel_lift
         self._lifts = hotel_lift.lifts
         self._status = "stop"
         self._interval = interval
+        self._lift_queue = lift_queue
 
         # self._timer = threading.Timer(self._interval,self.run_simulation)
         # self._thread = threading.Thread(name="move_timer")
@@ -1189,13 +1356,17 @@ class SimulationHelper():
     def simulate_timer(self):
         # move all the object
         # logging.debug(self._attendance)
-        for lift in self._lifts.values():
-            lift.perform_move()
 
         self._hotel_lift.drop_pick_up_attendance()
 
         for attendance in self._attendance:
             attendance.perform_move()
+
+        for lift in self._lifts.values():
+            lift.perform_move()
+
+        self._lift_queue.move_immediate()
+
 
 
     def run_simulation(self):
@@ -1288,6 +1459,6 @@ lift_queue = HotelLiftQueue(hotel_lift=hotel)
 simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=0.8, move_time=200, outside_time=100,
                             random_generator=random_generator, lift_queue=lift_queue)
 
-helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, interval=0.1)
+helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue = lift_queue, interval=0.1)
 
 helper.run()
