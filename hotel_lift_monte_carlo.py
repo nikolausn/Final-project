@@ -928,12 +928,16 @@ class HotelLiftQueue():
         # len_busy_down = 0
 
         # make a list of tuple queue
-        busy_queue_up = []
-        busy_queue_down = []
+        #busy_queue_up = []
+        #busy_queue_down = []
+        busy_queue = []
 
         for floor in self.hotel_lift.floors:
-            busy_queue_up.append((floor, len(floor.lift_queue_up)))
-            busy_queue_down.append((floor, len(floor.lift_queue_down)))
+            #busy_queue_up.append((floor, len(floor.lift_queue_up)))
+            #busy_queue_down.append((floor, len(floor.lift_queue_down)))
+
+            busy_queue.append((floor,len(floor.lift_queue_up),"up"))
+            busy_queue.append((floor, len(floor.lift_queue_down), "down"))
             """
             if len(floor.lift_queue_up) > len_busy_up:
                 len_busy_up = len(floor.lift_queue_up)
@@ -944,12 +948,79 @@ class HotelLiftQueue():
             """
 
         # sort the busy queue based on the attendance
-        busy_queue_up = sorted(busy_queue_up, key=lambda x: x[1])[::-1]
-        busy_queue_down = sorted(busy_queue_down, key=lambda x: x[1])[::-1]
+        #busy_queue_up = sorted(busy_queue_up, key=lambda x: x[1])[::-1]
+        #busy_queue_down = sorted(busy_queue_down, key=lambda x: x[1])[::-1]
+        busy_queue = sorted(busy_queue, key=lambda x: x[1])[::-1]
 
-        print("busy_queue_up: {}".format(busy_queue_up))
-        print("busy_queue_down: {}".format(busy_queue_down))
+        #print("busy_queue_up: {}".format(busy_queue_up))
+        #print("busy_queue_down: {}".format(busy_queue_down))
+        print("busy_queue: {}".format(busy_queue))
 
+        for queue_tuple in busy_queue:
+            if queue_tuple[1] > 0:
+                floor = queue_tuple[0]
+                lift_path_up = [x for x in range(len(self.hotel_lift.floors) * 2)]
+                # lift_path_down = [x for x in range(len(self.hotel_lift.floors) * 2)]
+                direction = None
+                lift_call_up = None
+                # lift_call_down = None
+                for lift in self.hotel_lift.lifts.values():
+                    try:
+                        lift_to_pos = nx.shortest_path(lift._graph, lift._position, floor.floor_name)
+                        # print(lift_to_pos)
+                        if len(lift_to_pos) > 1:
+                            lift_to_pos_up = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
+                        else:
+                            if lift.attendance < lift.capacity and lift._just_imediate:
+                                lift_call_up = lift
+                        """
+                        else:
+                            # immediate open
+                            if not lift._door_open and lift.attendance < lift.capacity:
+                                lift._timer+=lift.gen_close_door()
+                                lift._status = "up"
+                                break
+                        """
+
+                        """
+                        if busy_down!=None:
+                            lift_to_pos = nx.shortest_path(lift._graph, lift._position, busy_down.floor_name)
+                            #if len(lift_to_pos) > 1:
+                            lift_to_pos_down = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
+                        """
+
+                        if lift._status == "idle":
+                            if len(lift_path_up) > len(lift_to_pos):
+                                lift_path_up = lift_to_pos
+                                lift_call_up = lift
+                        elif queue_tuple[2] == lift._status and lift_to_pos_up == lift._status:
+                            if len(lift_path_up) > len(lift_to_pos):
+                                lift_path_up = lift_to_pos
+                                lift_call_up = lift
+
+                        """
+                        if busy_down!=None:
+                            if lift._status == "idle":
+                                if len(lift_path_down) > len(lift_to_pos_down):
+                                    lift_path_down = lift_to_pos_down
+                                    lift_call_down = lift
+                            elif lift_to_pos_down == lift._status:
+                                if len(lift_path_down) > len(lift_to_pos_down):
+                                    lift_path_down = lift_to_pos_down
+                                    lift_call_down = lift
+                        """
+                    except BaseException as ex:
+                        # print(ex)
+                        pass
+
+                # print("lift to pos up: {}".format(lift_to_pos_up))
+                # print("lift._status: {}".format(lift._status))
+
+                # print(lift_call_up)
+                if lift_call_up != None:
+                    lift_call_up.call(floor.floor_name, queue_tuple[2])
+
+        '''
         for queue_tuple in busy_queue_up:
             if queue_tuple[1] > 0:
                 floor = queue_tuple[0]
@@ -1076,7 +1147,7 @@ class HotelLiftQueue():
                 # print(lift_call_up)
                 if lift_call_up != None:
                     lift_call_up.call(floor.floor_name, "down")
-
+            '''
 
 class Person():
     """
