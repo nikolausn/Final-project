@@ -22,8 +22,10 @@ conference_room_floor = 2
 class Person:
     pass
 
+
 class Attendance:
     pass
+
 
 class Room:
     pass
@@ -62,6 +64,7 @@ class RoomType:
     RoomType is a base class of a room class,
     this class contains name and capacity to determine how many people can a room handle
     """
+
     def __init__(self, name_type: str, capacity: int):
         self._name_type = name_type
         self._capacity = capacity
@@ -81,6 +84,7 @@ class RandomDist():
     This class contains an abstract method for building a random generator
     Inherited class must implement this method
     """
+
     def __init__(self, name):
         self._name = name
 
@@ -101,6 +105,7 @@ class GaussianDist(RandomDist):
     """
     A random Gaussian Distribution generator
     """
+
     def __init__(self, mu: float, sigma: float, low: float, high: float):
         """
         To use this class we must provide mu (mean), sigma (standard deviation), low value, and high value
@@ -132,6 +137,7 @@ class GaussianDiscrete(GaussianDist):
     A random Gaussian Discrete generator
     This will include all the feature that gaussian has but will return a discrete value using round
     """
+
     def __init__(self, mu: float, sigma: float, low: float, high: float):
         """
                To use this class we must provide mu (mean), sigma (standard deviation), low value, and high value
@@ -153,6 +159,7 @@ class CapacityLimit:
     A base class for defining classes that has capacity
     like Floor, Lift, Room
     """
+
     def __init__(self, capacity=0):
         """
         determine the capacity in the initialization
@@ -170,6 +177,7 @@ class Floor(CapacityLimit):
     Floor is a base class for determining a hotel floor
     It is also inherited from the CapacityLimit
     """
+
     def __init__(self, capacity=0):
         CapacityLimit.__init__(self, capacity)
 
@@ -178,6 +186,7 @@ class HotelFloor(Floor):
     """
     HotelFloor is a class for determining a hotel floor
     """
+
     def __init__(self, floor_name: str, rooms_floor_count: dict, room_types: dict):
         """
         Initialize the hotel floor, you must define the floor name, floor rooms
@@ -212,7 +221,7 @@ class HotelFloor(Floor):
         Floor.__init__(self, capacity)
 
     @property
-    def rooms(self)->typing.List[Room]:
+    def rooms(self) -> typing.List[Room]:
         """
 
         :return: list of rooms in the floor
@@ -224,7 +233,7 @@ class HotelFloor(Floor):
         return self._floor_name
 
     @property
-    def lift_queue_up(self)->typing.List[Attendance]:
+    def lift_queue_up(self) -> typing.List[Attendance]:
         """
 
         :return: the queue of guests that calling the lift to go up
@@ -232,7 +241,7 @@ class HotelFloor(Floor):
         return self._lift_queue_up
 
     @property
-    def lift_queue_down(self)->typing.List[Attendance]:
+    def lift_queue_down(self) -> typing.List[Attendance]:
         """
 
         :return: the queue of guests that calling the lift to go down
@@ -370,7 +379,7 @@ class Lift(CapacityLimit):
         self._attendance_number = 0
         self._max_waiting_time = max_waiting_time
         self._timer = 0
-        self._attendance:typing.List[Attendance] = []
+        self._attendance: typing.List[Attendance] = []
 
         # variables for moving act
         self._status = "idle"
@@ -381,6 +390,8 @@ class Lift(CapacityLimit):
         self._call_imediate = ""
         self._next_move = "idle"
         self._door_open = False
+
+        self._just_imediate = False
 
         # Random distribution for maximum waiting time
         # it should use skewed distribution
@@ -474,7 +485,7 @@ class Lift(CapacityLimit):
         """
         self.attendance += new_att.capacity_unit
         self._attendance.append(new_att)
-        new_att.position="waiting_lift"
+        new_att.position = "waiting_lift"
         self.goto(new_att._target_floor)
 
     def pop_attendance(self, drop_att: Attendance):
@@ -541,7 +552,7 @@ class Lift(CapacityLimit):
         :return: None
         """
 
-        if self._status == "idle" and self.attendance == 0:
+        if self._status == "idle" and self.attendance == 0 and not self._just_imediate:
             # check which direction the lift should move
             try:
                 path = nx.shortest_path(self._graph, self._position, floor)
@@ -559,9 +570,10 @@ class Lift(CapacityLimit):
                 None
         else:
             if floor not in self._call_floor:
-                if self._call_imediate == "":
-                    if self._status == direction and self._next_move=="":
-                        self._call_floor.append(floor)
+                #if self._call_imediate == "":
+                #if self._status == direction and self._next_move == "":
+                if self._status == direction and not self._just_imediate:
+                    self._call_floor.append(floor)
 
             """
             if self._status == "up":
@@ -599,8 +611,19 @@ class Lift(CapacityLimit):
 
             if self._door_open:
                 self._door_open = False
+            else:
+                if self._target != "" and not self._just_imediate:
+                    self._position = self._target
 
-            if len(self._stop_floor) == 0 and len(self._call_floor) == 0 and self._call_imediate=="":
+                if len(self.graph.edge[self._position]) == 1:
+                    if len(self._stop_floor) > 0:
+                        if self._status == "down":
+                            self._status = "up"
+                        elif self._status == "up":
+                            self._status = "down"
+
+
+            if len(self._stop_floor) == 0 and len(self._call_floor) == 0 and self._call_imediate == "":
                 self._status = "idle"
             elif self._call_imediate != "":
                 if self._position == self._call_imediate:
@@ -608,16 +631,22 @@ class Lift(CapacityLimit):
                     self._status = self._next_move
                     self._next_move = ""
                     self._timer += self.gen_close_door()
+                    self._just_imediate = True
 
-            if self._call_imediate == "":
+            if self._call_imediate == "" and not self._just_imediate:
                 # reset the lift call if this is the last floor
                 if len(self._stop_floor) == 0:
                     self._call_floor.clear()
                     self._status = "idle"
+            else:
+                if len(self._stop_floor) == 0:
+                    self._call_floor.clear()
+                self._just_imediate = False
+
 
             if self._position in self._stop_floor:
                 # remove the position from the stop floor
-                print("position: {}".format(self._position))
+                # print("position: {}".format(self._position))
                 self._stop_floor.remove(self._position)
                 if self._position in self._call_floor:
                     self._call_floor.remove(self._position)
@@ -631,20 +660,11 @@ class Lift(CapacityLimit):
                     self._timer += self.gen_close_door()
                     # logging.debug("Lift {} arrive on {}, closing door in {}".format(self.name,self.position,self._timer))
 
-            #if self._status != "idle":
-                # logging.debug("Position Move {} Target {}".format(self.position,self._target))
-            #    self._position = self._target
-                # logging.debug("Position Move {}".format(self.position))
+                    # if self._status != "idle":
+                    # logging.debug("Position Move {} Target {}".format(self.position,self._target))
+                    #    self._position = self._target
+                    # logging.debug("Position Move {}".format(self.position))
 
-            if self._target!="":
-                self._position = self._target
-
-            if len(self.graph.edge[self._position]) == 1:
-                if len(self._stop_floor) > 0:
-                    if self._status == "down":
-                        self._status = "up"
-                    elif self._status == "up":
-                        self._status = "down"
 
             """
             move the lift
@@ -667,10 +687,12 @@ class Lift(CapacityLimit):
         logging.debug("Call Floor: {}".format(self._call_floor))
         logging.debug("Call Immediate: {}".format(self._call_imediate))
 
+
     def __repr__(self):
         # print(self.served_floor)
-        return "Lift {}, capacity: {}, attendance: {}, position: {}, serve: {}".format(self.name, self.capacity,
+        return "Lift {}, capacity: {}, attendance: {}, position: {}, imm: {}, next_move: {}, serve: {}".format(self.name, self.capacity,
                                                                                        self.attendance, self.position,
+                                                                                        self._call_imediate, self._next_move,
                                                                                        ",".join([str(x) for x in
                                                                                                  self.served_floor]))
 
@@ -680,6 +702,7 @@ class HotelLift():
     HotelLift
     is a class that combining the HotelFloor and the Lift, it also can be called as a simple hotel class
     """
+
     def __init__(self, number_of_floor: int, number_of_lift: int, rooms_floor_count, room_types: dict,
                  random_generator: RandomMovementGenerator):
         """
@@ -724,7 +747,7 @@ class HotelLift():
         """
 
     @property
-    def lifts(self) -> typing.Dict[str,Lift]:
+    def lifts(self) -> typing.Dict[str, Lift]:
         return self._lifts
 
     @property
@@ -746,30 +769,29 @@ class HotelLift():
         :return: None
         """
 
-
         for floor in self.floors:
             logging.debug("Floor: {}".format(floor.floor_name))
             logging.debug("Queue down: {}".format(len(floor.lift_queue_down)))
             logging.debug("Queue up: {}".format(len(floor.lift_queue_up)))
 
-
         for lift in self.lifts.values():
-            logging.debug("Drop Pick Up: {}, status: {}".format(lift,lift._status))
-            logging.debug("Lift: {}, attendance floor: {}".format(lift.name,[x._target_floor for x in lift._attendance]))
+            logging.debug("Drop Pick Up: {}, status: {}".format(lift, lift._status))
+            logging.debug(
+                "Lift: {}, attendance floor: {}".format(lift.name, [x._target_floor for x in lift._attendance]))
             # drop people that come out
             copy_attendance = lift._attendance.copy()
             for attend in copy_attendance:
                 if attend._target_floor == lift._position:
                     lift.pop_attendance(attend)
-                    #attend._target_floor = ""
-                    #attend._from_floor = ""
+                    # attend._target_floor = ""
+                    # attend._from_floor = ""
                     attend.position = attend._moving_path[0]
 
             if lift._door_open:
                 # check people that come in
                 if lift._status == "down":
                     lift_queue = self.floors[lift._position].lift_queue_down
-                    #while lift.attendance < lift.capacity or len(lift_queue)>0 :
+                    # while lift.attendance < lift.capacity or len(lift_queue)>0 :
                     for attend in lift_queue:
                         if lift.attendance == lift.capacity:
                             # if total attendance equal with capacity
@@ -782,7 +804,7 @@ class HotelLift():
                                 lift_queue.remove(attend)
                 elif lift._status == "up":
                     lift_queue = self.floors[lift._position].lift_queue_up
-                    #while lift.attendance < lift.capacity or len(lift_queue)>0 :
+                    # while lift.attendance < lift.capacity or len(lift_queue)>0 :
                     for attend in lift_queue:
                         if lift.attendance == lift.capacity:
                             # if total attendance equal with capacity
@@ -805,6 +827,7 @@ class HotelLiftQueue():
     """
     Helper class for a lift queue
     """
+
     def __init__(self, hotel_lift: HotelLift):
         """
         give the HotelLift object
@@ -868,7 +891,7 @@ class HotelLiftQueue():
             if lift._status == "idle":
         """
 
-    def call_lift_priority(self,att:Attendance,floor:str,target:str):
+    def call_lift_priority(self, att: Attendance, floor: str, target: str):
         """
         Call the lift using the priority queue in each floor
         :param att:
@@ -898,18 +921,18 @@ class HotelLiftQueue():
 
     def move_immediate(self):
         # check the busiest floor
-        #busy_up = None
-        #busy_down = None
+        # busy_up = None
+        # busy_down = None
 
-        #len_busy_up = 0
-        #len_busy_down = 0
+        # len_busy_up = 0
+        # len_busy_down = 0
 
-        #make a list of tuple queue
+        # make a list of tuple queue
         busy_queue_up = []
         busy_queue_down = []
 
         for floor in self.hotel_lift.floors:
-            busy_queue_up.append((floor,len(floor.lift_queue_up)))
+            busy_queue_up.append((floor, len(floor.lift_queue_up)))
             busy_queue_down.append((floor, len(floor.lift_queue_down)))
             """
             if len(floor.lift_queue_up) > len_busy_up:
@@ -921,113 +944,145 @@ class HotelLiftQueue():
             """
 
         # sort the busy queue based on the attendance
-        busy_queue_up = sorted(busy_queue_up,key=lambda x: x[1])[::-1]
-        busy_queue_down = sorted(busy_queue_down,key=lambda x: x[1])[::-1]
+        busy_queue_up = sorted(busy_queue_up, key=lambda x: x[1])[::-1]
+        busy_queue_down = sorted(busy_queue_down, key=lambda x: x[1])[::-1]
 
+        print("busy_queue_up: {}".format(busy_queue_up))
+        print("busy_queue_down: {}".format(busy_queue_down))
 
         for queue_tuple in busy_queue_up:
-            floor = queue_tuple[0]
-            lift_path_up = [x for x in range(len(self.hotel_lift.floors) * 2)]
-            #lift_path_down = [x for x in range(len(self.hotel_lift.floors) * 2)]
-            direction = None
-            lift_call_up = None
-            #lift_call_down = None
-            for lift in self.hotel_lift.lifts.values():
-                try:
-                    lift_to_pos = nx.shortest_path(lift._graph, lift._position, floor.floor_name)
-                    #print(lift_to_pos)
-                    #if len(lift_to_pos) > 1:
-                    lift_to_pos_up = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
-                    """
-                    if busy_down!=None:
-                        lift_to_pos = nx.shortest_path(lift._graph, lift._position, busy_down.floor_name)
-                        #if len(lift_to_pos) > 1:
-                        lift_to_pos_down = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
-                    """
+            if queue_tuple[1] > 0:
+                floor = queue_tuple[0]
+                lift_path_up = [x for x in range(len(self.hotel_lift.floors) * 2)]
+                # lift_path_down = [x for x in range(len(self.hotel_lift.floors) * 2)]
+                direction = None
+                lift_call_up = None
+                # lift_call_down = None
+                for lift in self.hotel_lift.lifts.values():
+                    try:
+                        lift_to_pos = nx.shortest_path(lift._graph, lift._position, floor.floor_name)
+                        # print(lift_to_pos)
+                        if len(lift_to_pos) > 1:
+                            lift_to_pos_up = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
+                        else:
+                            if lift.attendance < lift.capacity and lift._just_imediate:
+                                lift_call_up = lift
+                        """
+                        else:
+                            # immediate open
+                            if not lift._door_open and lift.attendance < lift.capacity:
+                                lift._timer+=lift.gen_close_door()
+                                lift._status = "up"
+                                break
+                        """
 
-                    if lift._status == "idle":
-                        if len(lift_path_up) > len(lift_to_pos):
-                            lift_path_up = lift_to_pos
-                            lift_call_up = lift
-                    elif "up" == lift._status and lift_to_pos_up==lift._status and not lift._door_open:
-                        if len(lift_path_up) > len(lift_to_pos):
-                            lift_path_up = lift_to_pos
-                            lift_call_up = lift
+                        """
+                        if busy_down!=None:
+                            lift_to_pos = nx.shortest_path(lift._graph, lift._position, busy_down.floor_name)
+                            #if len(lift_to_pos) > 1:
+                            lift_to_pos_down = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
+                        """
 
-                    """
-                    if busy_down!=None:
                         if lift._status == "idle":
-                            if len(lift_path_down) > len(lift_to_pos_down):
-                                lift_path_down = lift_to_pos_down
-                                lift_call_down = lift
-                        elif lift_to_pos_down == lift._status:
-                            if len(lift_path_down) > len(lift_to_pos_down):
-                                lift_path_down = lift_to_pos_down
-                                lift_call_down = lift
-                    """
-                except BaseException as ex:
-                    #print(ex)
-                    pass
+                            if len(lift_path_up) > len(lift_to_pos):
+                                lift_path_up = lift_to_pos
+                                lift_call_up = lift
+                        elif "up" == lift._status and lift_to_pos_up == lift._status:
+                            if len(lift_path_up) > len(lift_to_pos):
+                                lift_path_up = lift_to_pos
+                                lift_call_up = lift
 
-            #print(lift_call_up)
-            if lift_call_up != None:
-                lift_call_up.call(floor.floor_name, "up")
+                        """
+                        if busy_down!=None:
+                            if lift._status == "idle":
+                                if len(lift_path_down) > len(lift_to_pos_down):
+                                    lift_path_down = lift_to_pos_down
+                                    lift_call_down = lift
+                            elif lift_to_pos_down == lift._status:
+                                if len(lift_path_down) > len(lift_to_pos_down):
+                                    lift_path_down = lift_to_pos_down
+                                    lift_call_down = lift
+                        """
+                    except BaseException as ex:
+                        # print(ex)
+                        pass
 
+                #print("lift to pos up: {}".format(lift_to_pos_up))
+                #print("lift._status: {}".format(lift._status))
+
+                # print(lift_call_up)
+                if lift_call_up != None:
+                    lift_call_up.call(floor.floor_name, "up")
 
         for queue_tuple in busy_queue_down:
-            floor = queue_tuple[0]
-            lift_path_up = [x for x in range(len(self.hotel_lift.floors) * 2)]
-            # lift_path_down = [x for x in range(len(self.hotel_lift.floors) * 2)]
-            direction = None
-            lift_call_up = None
-            # lift_call_down = None
-            for lift in self.hotel_lift.lifts.values():
-                try:
-                    lift_to_pos = nx.shortest_path(lift._graph, lift._position, floor.floor_name)
-                    #print(lift_to_pos)
-                    # if len(lift_to_pos) > 1:
-                    lift_to_pos_up = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
-                    """
-                    if busy_down!=None:
-                        lift_to_pos = nx.shortest_path(lift._graph, lift._position, busy_down.floor_name)
-                        #if len(lift_to_pos) > 1:
-                        lift_to_pos_down = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
-                    """
+            if queue_tuple[1] > 0 :
+                floor = queue_tuple[0]
+                lift_path_up = [x for x in range(len(self.hotel_lift.floors) * 2)]
+                # lift_path_down = [x for x in range(len(self.hotel_lift.floors) * 2)]
+                direction = None
+                lift_call_up = None
+                # lift_call_down = None
+                for lift in self.hotel_lift.lifts.values():
+                    try:
+                        lift_to_pos = nx.shortest_path(lift._graph, lift._position, floor.floor_name)
+                        # print(lift_to_pos)
+                        if len(lift_to_pos) > 1:
+                            lift_to_pos_up = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
+                        else:
+                            if lift.attendance < lift.capacity and lift._just_imediate:
+                                lift_call_up = lift
+                        """
+                        else:
+                            if not lift._door_open and lift.attendance < lift.capacity:
+                                lift._timer+=lift.gen_close_door()
+                                lift._status = "down"
+                                break
+                        """
 
-                    if lift._status == "idle":
-                        if len(lift_path_up) > len(lift_to_pos):
-                            lift_path_up = lift_to_pos
-                            lift_call_up = lift
-                    elif "down" == lift._status and lift_to_pos_up == lift._status and not lift._door_open:
-                        if len(lift_path_up) > len(lift_to_pos):
-                            lift_path_up = lift_to_pos
-                            lift_call_up = lift
+                        """
+                        if busy_down!=None:
+                            lift_to_pos = nx.shortest_path(lift._graph, lift._position, busy_down.floor_name)
+                            #if len(lift_to_pos) > 1:
+                            lift_to_pos_down = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
+                        """
 
-                    """
-                    if busy_down!=None:
                         if lift._status == "idle":
-                            if len(lift_path_down) > len(lift_to_pos_down):
-                                lift_path_down = lift_to_pos_down
-                                lift_call_down = lift
-                        elif lift_to_pos_down == lift._status:
-                            if len(lift_path_down) > len(lift_to_pos_down):
-                                lift_path_down = lift_to_pos_down
-                                lift_call_down = lift
-                    """
-                except BaseException as ex:
-                    #print(ex)
-                    pass
+                            if len(lift_path_up) > len(lift_to_pos):
+                                lift_path_up = lift_to_pos
+                                lift_call_up = lift
+                        elif "down" == lift._status and lift_to_pos_up == lift._status:
+                            if len(lift_path_up) > len(lift_to_pos):
+                                lift_path_up = lift_to_pos
+                                lift_call_up = lift
 
-            #print(lift_call_up)
-            if lift_call_up != None:
-                lift_call_up.call(floor.floor_name, "down")
+                        """
+                        if busy_down!=None:
+                            if lift._status == "idle":
+                                if len(lift_path_down) > len(lift_to_pos_down):
+                                    lift_path_down = lift_to_pos_down
+                                    lift_call_down = lift
+                            elif lift_to_pos_down == lift._status:
+                                if len(lift_path_down) > len(lift_to_pos_down):
+                                    lift_path_down = lift_to_pos_down
+                                    lift_call_down = lift
+                        """
+                    except BaseException as ex:
+                        # print(ex)
+                        pass
 
+                #print("lift to pos down: {}".format(lift_to_pos_up))
+                #print("lift._status: {}".format(lift._status))
+
+                # print(lift_call_up)
+                if lift_call_up != None:
+                    lift_call_up.call(floor.floor_name, "down")
 
 
 class Person():
     """
     Base class for the Attendance
     """
+
     def __init__(self, name: str, move_time: int, outside_time: int, random_generator: RandomMovementGenerator,
                  schedule={}, capacity_unit=1):
         """
@@ -1062,6 +1117,13 @@ class Attendance(Person):
     _target_dest = ["room", "outside", "conference", "dining"]
     _status = ["idle", "go_lift", "waiting_lift", "in_lift", "on_move"]
 
+    # destination floor contains dictionary that refer to designated floor
+    _dest_floor = {
+        "outside": 0,
+        "conference": 1,
+        "dining": 2
+    }
+
     # Create a DAG for moving behaviour
 
     _nodes = ["room", "waiting_lift", "in_lift", "outside"]
@@ -1079,8 +1141,16 @@ class Attendance(Person):
     _move_graph.add_edge("outside", "waiting_lift")
     _move_graph.add_edge("in_lift", "room")
 
+    # move graph for dining
+    _move_graph.add_edge("dining", "waiting_lift")
+    _move_graph.add_edge("in_lift", "dining")
+
+    # move graph for conference
+    _move_graph.add_edge("conference", "waiting_lift")
+    _move_graph.add_edge("in_lift", "conference")
+
     def __init__(self, room: Room, name: str, move_time: int, outside_time: int,
-                 random_generator: RandomMovementGenerator, lift_queue: HotelLiftQueue, schedule: dict = {},
+                 random_generator: RandomMovementGenerator, lift_queue: HotelLiftQueue, schedule: list = [],
                  capacity_unit: int = 1):
         """
 
@@ -1100,6 +1170,9 @@ class Attendance(Person):
         self._lift_queue = lift_queue
 
         self._schedule = schedule
+        self._schedule_queue = schedule.copy()
+        # print(self._schedule_queue)
+
         self._move_time = move_time
         self._outside_time = outside_time
         self._random_move_time = GaussianDist(mu=move_time, sigma=move_time / 2, low=0, high=move_time * 2)
@@ -1157,82 +1230,94 @@ class Attendance(Person):
         :return:
         """
 
-        #logging.debug(self._moving_path)
+        # logging.debug(self._moving_path)
 
-        #logging.debug(self.position)
+        # logging.debug(self.position)
 
         if len(self._moving_path) == 0:
             self.generate_next_move()
 
-        if self._next_move == 0 and self._moving_path[0] == self._position:
-            # pop the value
-            #logging.debug("Position Now: {}".format(self._position))
-            popped = self._moving_path.pop(0)
-            #logging.debug("person {}, pop path {}".format(self._name, popped))
-            self._action = self._moving_path[0]
+        # print(self._position)
+        # print(self._target)
+        # print(self._moving_path)
 
-        if self._action == self._target:
-            self._position = self._moving_path.pop(0)
-            total_time = self._waiting_lift_time + self._in_lift_time
-            with open("result.txt","a") as file:
-                file.write(",".join([str(x) for x in [self.name,self._from_floor,self._target_floor,self._waiting_lift_time,self._in_lift_time,total_time]])+"\n")
+        if len(self._moving_path) > 0:
+            if self._next_move == 0 and self._moving_path[0] == self._position:
+                # pop the value
+                # logging.debug("Position Now: {}".format(self._position))
+                popped = self._moving_path.pop(0)
+                # logging.debug("person {}, pop path {}".format(self._name, popped))
+                self._action = self._moving_path[0]
 
-            self._target_floor = ""
-            self._from_floor = ""
-            self._waiting_lift_time = 0
-            self._in_lift_time = 0
+            if self._action == self._target:
+                self._position = self._moving_path.pop(0)
+                total_time = self._waiting_lift_time + self._in_lift_time
+                with open("result.txt", "a") as file:
+                    file.write(",".join([str(x) for x in
+                                         [self.name, self._from_floor, self._target_floor, self._waiting_lift_time,
+                                          self._in_lift_time, total_time]]) + "\n")
 
-        if self._action == "waiting_lift":
-            """
-            call the lift
-            """
-            if self._position == "room":
-                from_where = self._room.floor.floor_name
-            elif self._position == "outside":
-                from_where = 0
+                self._target_floor = ""
+                self._from_floor = ""
+                self._waiting_lift_time = 0
+                self._in_lift_time = 0
 
-            if self._target == "room":
-                to_where = self._room.floor.floor_name
-            elif self._target == "outside":
-                to_where = 0
-
-            self._from_floor = from_where
-            self._target_floor = to_where
-
-            if from_where!=to_where:
-                # call lift only if the attendance go to another floor
-                #logging.debug("Person {}, from {} to {}".format(self._name,self._position,to_where))
-                #lift, path, direction = self._lift_queue.call_lift_priority(self, from_where, to_where)
-                #logging.debug("Person {}, call lift {}, path: {}".format(self._name, lift, path))
-
-                self._lift_queue.call_lift_priority(self, from_where, to_where)
+            if self._action == "waiting_lift":
+                """
+                call the lift
+                """
 
                 """
-                if direction == "up":
-                    if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_up:
-                        self._lift_queue.hotel_lift.floors[from_where].lift_queue_up.append(self)
-                elif direction == "down":
-                    if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_down:
-                        self._lift_queue.hotel_lift.floors[from_where].lift_queue_down.append(self)
+                if self._position == "room":
+                    from_where = self._room.floor.floor_name
+                elif self._position == "outside":
+                    from_where = 0
+    
+                if self._target == "room":
+                    to_where = self._room.floor.floor_name
+                elif self._target == "outside":
+                    to_where = 0
                 """
-            self._waiting_lift_time+=1
+                from_where = self.transform_place(self._position)
+                to_where = self.transform_place(self._target)
 
-            """
-            # check if there is a lift available for the attendance
-            for lift in self._lift_queue.hotel_lift.lifts.values():
-                if lift.position == from_where:
-                    if lift._status == direction:
-                        # if the direction is the same
-                        lift.add_attendance()
-            """
+                self._from_floor = from_where
+                self._target_floor = to_where
 
-        if self._action == "in_lift":
-            self._in_lift_time += 1
+                if from_where != to_where:
+                    # call lift only if the attendance go to another floor
+                    # logging.debug("Person {}, from {} to {}".format(self._name,self._position,to_where))
+                    # lift, path, direction = self._lift_queue.call_lift_priority(self, from_where, to_where)
+                    # logging.debug("Person {}, call lift {}, path: {}".format(self._name, lift, path))
 
-        if self._next_move > 0:
-            self._next_move -= 1
-            #logging.debug(
-            #    "Person {}, move from {} to {} in {}".format(self._name, self._position, self._target, self._next_move))
+                    self._lift_queue.call_lift_priority(self, from_where, to_where)
+
+                    """
+                    if direction == "up":
+                        if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_up:
+                            self._lift_queue.hotel_lift.floors[from_where].lift_queue_up.append(self)
+                    elif direction == "down":
+                        if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_down:
+                            self._lift_queue.hotel_lift.floors[from_where].lift_queue_down.append(self)
+                    """
+                self._waiting_lift_time += 1
+
+                """
+                # check if there is a lift available for the attendance
+                for lift in self._lift_queue.hotel_lift.lifts.values():
+                    if lift.position == from_where:
+                        if lift._status == direction:
+                            # if the direction is the same
+                            lift.add_attendance()
+                """
+
+            if self._action == "in_lift":
+                self._in_lift_time += 1
+
+            if self._next_move > 0:
+                self._next_move -= 1
+                # logging.debug(
+                #    "Person {}, move from {} to {} in {}".format(self._name, self._position, self._target, self._next_move))
 
     @property
     def target(self):
@@ -1250,22 +1335,59 @@ class Attendance(Person):
     def action(self):
         return self._action
 
+    def transform_place(self, place):
+        if place in self._dest_floor.keys():
+            return self._dest_floor[place]
+        elif place == "room":
+            return self._room.floor.floor_name
+        elif place == "random":
+            floor = np.random.randint(len(self._lift_queue.hotel_lift.floors), size=1)
+            return self._lift_queue.hotel_lift.floors[floor].floor_name
+
+        return None
+
     def generate_next_move(self):
         """
         Method to generate next move for the attendance
         might include the move that are assigned in the schedule
         :return:
         """
-        if self._position == "room":
-            self._next_move = round(self._random_move_time.random())
-            # self._next_move = self._random_generator.random_move_time()
-            self._target = "outside"
-        else:
-            self._next_move = round(self._random_outside_time.random())
-            # self._next_move = self._random_generator.random_outside_time()
-            self._target = "room"
+        # print(self._schedule_queue)
+        if len(self._schedule) > 0:
+            if len(self._schedule_queue) > 1:
+                action_now = self._schedule_queue.pop(0)
+                # print(action_now)
+                self._position = action_now[0]
+                # only if the schedule has next move
+                self._next_move = GaussianDiscrete(mu=action_now[1], sigma=2 / 3 * action_now[1], low=0,
+                                                   high=2 * action_now[1]).random()
+                # next position
+                self._target = self._schedule_queue[0][0]
 
-        self._moving_path = nx.shortest_path(self._move_graph, self._position, self._target)
+                self._moving_path = nx.shortest_path(self._move_graph, self._position, self._target)
+
+            else:
+                self._target = ""
+        else:
+            if self._position == "room":
+                self._next_move = round(self._random_move_time.random())
+                # self._next_move = self._random_generator.random_move_time()
+                self._target = "outside"
+            else:
+                self._next_move = round(self._random_outside_time.random())
+                # self._next_move = self._random_generator.random_outside_time()
+                self._target = "room"
+
+            self._moving_path = nx.shortest_path(self._move_graph, self._position, self._target)
+
+    def set_schedule(self, schedule):
+        """
+        Method to set the schedule of an attendance
+
+        :return: None
+        """
+        self._schedule = schedule
+        self._schedule_queue = schedule.copy()
 
     def __repr__(self):
         return "name: {}, room: {}".format(self.name, self.room)
@@ -1275,15 +1397,16 @@ class InitialGenerator():
     """
     InitialGenerator is a class to generate random attendance
     """
+
     def __init__(self, room_stack: list, room_occupancy_pctg: float, move_time: int, outside_time: int,
-                 random_generator: RandomMovementGenerator, lift_queue: HotelLiftQueue):
+                 random_generator: RandomMovementGenerator, lift_queue: HotelLiftQueue, schedule=[]):
         # sample room_stack based on occupancy percentage
         total_rooms = len(room_stack)
         occupied_index = np.random.randint(total_rooms, size=np.int(room_occupancy_pctg * total_rooms))
         self._room_stack = room_stack
         logging.debug(occupied_index)
         # occupied = [room_stack[x] for x in occupied_index]
-        self._attendance = []
+        self._attendance: typing.List[Attendance] = []
         number = 0
         for i in occupied_index:
             room = room_stack[i]
@@ -1291,6 +1414,8 @@ class InitialGenerator():
             # for every room occupied, create attendance person based on the capacity
             number_of_attendance = np.random.randint(room.capacity) + 1
             # print(room)
+
+            # default move, people just going back and forth within room and outside
             for j in range(number_of_attendance):
                 # create new attendance
                 new_att = Attendance(room, number, move_time=move_time, outside_time=outside_time,
@@ -1299,6 +1424,23 @@ class InitialGenerator():
                 room.attendance_checkin(new_att)
                 self._attendance.append(new_att)
                 number += 1
+
+        # custom schedule
+        if len(schedule) > 0:
+            # shufle the attendance
+            random.shuffle(self._attendance)
+            attendance_number = len(self._attendance)
+
+            # print(schedule)
+
+            for x in schedule:
+                # print(x)
+                number = math.ceil(x[1] * attendance_number)
+                # print(number)
+                number = number if (attendance_number - number > 0) else attendance_number
+                for i in range(number):
+                    self._attendance[attendance_number - 1 - i].set_schedule(x[0])
+                attendance_number -= number
 
     @property
     def attendance(self):
@@ -1317,7 +1459,8 @@ class SimulationHelper():
     """
     SimulationHelper is a class that run the simulation in a Thread
     """
-    def __init__(self, attendance: list, hotel_lift: HotelLift, lift_queue: HotelLiftQueue,interval: float = 1):
+
+    def __init__(self, attendance: list, hotel_lift: HotelLift, lift_queue: HotelLiftQueue, interval: float = 1):
         self._attendance = attendance
         self._hotel_lift = hotel_lift
         self._lifts = hotel_lift.lifts
@@ -1357,24 +1500,22 @@ class SimulationHelper():
         # move all the object
         # logging.debug(self._attendance)
 
-        self._hotel_lift.drop_pick_up_attendance()
-
         for attendance in self._attendance:
             attendance.perform_move()
+
+        self._hotel_lift.drop_pick_up_attendance()
 
         for lift in self._lifts.values():
             lift.perform_move()
 
         self._lift_queue.move_immediate()
 
-
-
     def run_simulation(self):
         while self._status == "start":
             # print(self._status)
             self.simulate_timer()
             time.sleep(self._interval)
-        print(self._status)
+        # print(self._status)
 
         """
         print(self._status)
@@ -1406,7 +1547,7 @@ class SimulationHelper():
         if not self._timer.is_alive():
             self._timer.start()
         """
-        print(self._status)
+        # print(self._status)
 
     def stop(self):
         self._status = "stop"
@@ -1415,7 +1556,6 @@ class SimulationHelper():
 
 
 # configuration
-
 number_of_floor = 20
 
 custom_floor = [0, 10]
@@ -1447,18 +1587,32 @@ rooms_floor_count = {
     "deluxe": 10
 }
 
+# the schedule configuration for each person
+# a list of tuple contains from position and waiting time until next move in seconds
+schedule_1 = [("room", 14400), ("outside", 10800), ("dining", 3600), ("room", 0)]
+schedule_2 = [("outside", 3600), ("dining", 3600), ("room", 0)]
+schedule_3 = [("room", 3600), ("dining", 1800), ("conference", 3600), ("room", 0)]
+
+normal_schedule_list = [(schedule_1, 0.5), (schedule_2, 0.3), (schedule_3, 0.2)]
+
+# evacuation schedule
+evac_schedule = [([("room", 5), ("outside", 0)], 1)]
+
+# registration_schedule
+batch_registration_schedule = [([("outside", 1800), ("room", 0)], 1)]
+
 # HotelFloor(rooms_floor_count,room_types)
 random_generator = RandomMovementGenerator(person={"move_time": 14400, "outside_time": 3600},
                                            lift={"max_waiting_time": 10, "sigma": 5})
 
 hotel = HotelLift(20, 4, rooms_floor_count, room_types, random_generator=random_generator)
-print(hotel)
+# print(hotel)
 len(hotel.rooms)
 
 lift_queue = HotelLiftQueue(hotel_lift=hotel)
 simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=0.8, move_time=200, outside_time=100,
-                            random_generator=random_generator, lift_queue=lift_queue)
+                            random_generator=random_generator, lift_queue=lift_queue, schedule=normal_schedule_list)
 
-helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue = lift_queue, interval=0.1)
+helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue=lift_queue, interval=0.1)
 
 helper.run()
