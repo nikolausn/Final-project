@@ -12,7 +12,7 @@ logging.getLogger().setLevel(logging.DEBUG)
 logging.debug("TEST")
 
 # make a rules using graph network
-lift_number = 4
+lift_number = 5
 number_of_floor = 20
 conference_room_floor = 2
 
@@ -55,7 +55,6 @@ class RandomMovementGenerator():
         return self._random_outside_time.random()
 
     def gen_close_door(self):
-        self._door
         return math.ceil(self._random_close_door.random())
 
 
@@ -361,7 +360,7 @@ class Lift(CapacityLimit):
 
     def __init__(self, name: str, random_generator: RandomMovementGenerator, average_speed: int = 1,
                  floor_configuration: dict = {}, capacity: int = 0, position: int = 0,
-                 max_waiting_time: int = 10):
+                 max_waiting_time: int = 10,lift_log:str="lift.log"):
         """
 
         :param name:
@@ -380,6 +379,7 @@ class Lift(CapacityLimit):
         self._max_waiting_time = max_waiting_time
         self._timer = 0
         self._attendance: typing.List[Attendance] = []
+        self._lift_log = lift_log
 
         # variables for moving act
         self._status = "idle"
@@ -426,6 +426,11 @@ class Lift(CapacityLimit):
         Generate close door for simulation
         :return: random gaussian of the closing door based on maximum waiting time
         """
+        # write the visited floor into the log
+        with open(self._lift_log, "a") as file:
+            file.write(",".join([str(x) for x in
+                                 [self._name, self._time_tick, self._position, self._attendance_number]]) + "\n")
+
         self._door_open = True
         return math.ceil(self._random_gauss.random())
 
@@ -497,6 +502,7 @@ class Lift(CapacityLimit):
         """
         self._attendance.remove(drop_att)
         self.attendance -= drop_att.capacity_unit
+        drop_att.position = "in_lift"
 
     def go_up(self):
         """
@@ -598,13 +604,14 @@ class Lift(CapacityLimit):
                 self._status = self._graph.edge[path[0]][path[1]]["attr"]["dir"]
             self._stop_floor.append(floor)
 
-    def perform_move(self):
+    def perform_move(self,time_tick:int):
         """
         check the stop_floor, if the lift is called to stop at that floor,
         perform waiting time generator
 
         :return:
         """
+        self._time_tick = time_tick
 
         if self._timer == 0:
             # if there is no stop call
@@ -704,7 +711,7 @@ class HotelLift():
     """
 
     def __init__(self, number_of_floor: int, number_of_lift: int, rooms_floor_count, room_types: dict,
-                 random_generator: RandomMovementGenerator):
+                 random_generator: RandomMovementGenerator, lift_log="lift.log"):
         """
         give number of floor, room_types, and rooms_floor_count configuration
         The class will generate all the Object needed based on configuration
@@ -732,7 +739,7 @@ class HotelLift():
             # logging.debug(x)
             config = lift_floor_configuration[x]
             self.lifts[x] = Lift(name=x, floor_configuration=config, capacity=20, position=0,
-                                 random_generator=random_generator)
+                                 random_generator=random_generator,lift_log=lift_log)
 
         """
         for x in range(number_of_lift):
@@ -800,7 +807,7 @@ class HotelLift():
                         if attend._target_floor in lift.served_floor:
                             if attend.capacity_unit + lift.attendance <= lift.capacity:
                                 lift.add_attendance(attend)
-                                attend.position = "waiting_lift"
+                                #attend.position = "waiting_lift"
                                 lift_queue.remove(attend)
                 elif lift._status == "up":
                     lift_queue = self.floors[lift._position].lift_queue_up
@@ -813,7 +820,7 @@ class HotelLift():
                         if attend._target_floor in lift.served_floor:
                             if attend.capacity_unit + lift.attendance <= lift.capacity:
                                 lift.add_attendance(attend)
-                                attend.position = "waiting_lift"
+                                #attend.position = "waiting_lift"
                                 lift_queue.remove(attend)
 
     def __repr__(self):
@@ -971,8 +978,11 @@ class HotelLiftQueue():
                         if len(lift_to_pos) > 1:
                             lift_to_pos_up = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
                         else:
-                            if lift.attendance < lift.capacity and lift._just_imediate:
-                                lift_call_up = lift
+                            if lift.attendance < lift.capacity and lift._status=="idle":
+                                lift._timer+=lift.gen_close_door()
+                                lift._status = queue_tuple[2]
+                                break
+                                #lift_call_up = lift
                         """
                         else:
                             # immediate open
@@ -1222,7 +1232,7 @@ class Attendance(Person):
 
     def __init__(self, room: Room, name: str, move_time: int, outside_time: int,
                  random_generator: RandomMovementGenerator, lift_queue: HotelLiftQueue, schedule: list = [],
-                 capacity_unit: int = 1):
+                 capacity_unit: int = 1, attendance_log = "attendance.log"):
         """
 
         :param room: room object the attendance assigned for
@@ -1243,6 +1253,7 @@ class Attendance(Person):
         self._schedule = schedule
         self._schedule_queue = schedule.copy()
         # print(self._schedule_queue)
+        self._attendance_log = attendance_log
 
         self._move_time = move_time
         self._outside_time = outside_time
@@ -1291,7 +1302,11 @@ class Attendance(Person):
     def status(self):
         return self._status
 
-    def perform_move(self):
+    @property
+    def schedule_queue(self):
+        return self._schedule_queue
+
+    def perform_move(self,time_tick:int):
         """
         This function will be a counter time for moving
         every time this function called, moving time will be reduced
@@ -1301,11 +1316,15 @@ class Attendance(Person):
         :return:
         """
 
-        # logging.debug(self._moving_path)
+        #logging.debug("Name: {}".format(self.name))
+        #logging.debug("Moving Path: {}".format(self._moving_path))
+        #logging.debug("Position: {}, Action: {}".format(self.position,self.action))
+        self._time_tick = time_tick
 
         # logging.debug(self.position)
 
         if len(self._moving_path) == 0:
+            self._start_time = None
             self.generate_next_move()
 
         # print(self._position)
@@ -1323,9 +1342,9 @@ class Attendance(Person):
             if self._action == self._target:
                 self._position = self._moving_path.pop(0)
                 total_time = self._waiting_lift_time + self._in_lift_time
-                with open("result.txt", "a") as file:
+                with open(self._attendance_log, "a") as file:
                     file.write(",".join([str(x) for x in
-                                         [self.name, self._from_floor, self._target_floor, self._waiting_lift_time,
+                                         [self.name, self._start_time, time_tick, self._from_floor, self._target_floor, self._waiting_lift_time,
                                           self._in_lift_time, total_time]]) + "\n")
 
                 self._target_floor = ""
@@ -1371,6 +1390,11 @@ class Attendance(Person):
                         if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_down:
                             self._lift_queue.hotel_lift.floors[from_where].lift_queue_down.append(self)
                     """
+                else:
+                    self._moving_path.clear()
+                    self._action = self._target
+                    self._position = self._target
+
                 self._waiting_lift_time += 1
 
                 """
@@ -1432,6 +1456,8 @@ class Attendance(Person):
                 # only if the schedule has next move
                 self._next_move = GaussianDiscrete(mu=action_now[1], sigma=2 / 3 * action_now[1], low=0,
                                                    high=2 * action_now[1]).random()
+                if self._start_time == None:
+                    self._start_time = self._time_tick + self._next_move
                 # next position
                 self._target = self._schedule_queue[0][0]
 
@@ -1470,7 +1496,7 @@ class InitialGenerator():
     """
 
     def __init__(self, room_stack: list, room_occupancy_pctg: float, move_time: int, outside_time: int,
-                 random_generator: RandomMovementGenerator, lift_queue: HotelLiftQueue, schedule=[]):
+                 random_generator: RandomMovementGenerator, lift_queue: HotelLiftQueue, schedule=[],attendance_log="attendance.log"):
         # sample room_stack based on occupancy percentage
         total_rooms = len(room_stack)
         occupied_index = np.random.randint(total_rooms, size=np.int(room_occupancy_pctg * total_rooms))
@@ -1490,7 +1516,7 @@ class InitialGenerator():
             for j in range(number_of_attendance):
                 # create new attendance
                 new_att = Attendance(room, number, move_time=move_time, outside_time=outside_time,
-                                     random_generator=random_generator, lift_queue=lift_queue)
+                                     random_generator=random_generator, lift_queue=lift_queue,attendance_log=attendance_log)
                 new_att.position = "room"
                 room.attendance_checkin(new_att)
                 self._attendance.append(new_att)
@@ -1500,18 +1526,22 @@ class InitialGenerator():
         if len(schedule) > 0:
             # shufle the attendance
             random.shuffle(self._attendance)
+            total_attendance = len(self._attendance)
             attendance_number = len(self._attendance)
 
             # print(schedule)
 
             for x in schedule:
                 # print(x)
-                number = math.ceil(x[1] * attendance_number)
+                number = math.ceil(x[1] * total_attendance)
                 # print(number)
                 number = number if (attendance_number - number > 0) else attendance_number
                 for i in range(number):
                     self._attendance[attendance_number - 1 - i].set_schedule(x[0])
+                    self._attendance[attendance_number - 1 - i].position = x[0][0][0]
                 attendance_number -= number
+                #print("Number: {}".format(number))
+            #print("Test: {}".format(attendance_number))
 
     @property
     def attendance(self):
@@ -1531,13 +1561,15 @@ class SimulationHelper():
     SimulationHelper is a class that run the simulation in a Thread
     """
 
-    def __init__(self, attendance: list, hotel_lift: HotelLift, lift_queue: HotelLiftQueue, interval: float = 1):
+    def __init__(self, attendance: list, hotel_lift: HotelLift, lift_queue: HotelLiftQueue, interval: float = 1, break_enable=True):
         self._attendance = attendance
         self._hotel_lift = hotel_lift
         self._lifts = hotel_lift.lifts
         self._status = "stop"
         self._interval = interval
         self._lift_queue = lift_queue
+        self._time = 0
+        self._break_enable = break_enable
 
         # self._timer = threading.Timer(self._interval,self.run_simulation)
         # self._thread = threading.Thread(name="move_timer")
@@ -1571,15 +1603,32 @@ class SimulationHelper():
         # move all the object
         # logging.debug(self._attendance)
 
+        attendance_move_schedule = 0
+        attendance_moving_path = 0
+
+        #attendance:Attendance
+
         for attendance in self._attendance:
-            attendance.perform_move()
+            attendance.perform_move(self._time)
+            attendance_move_schedule+=len(attendance.schedule_queue)
+            attendance_moving_path+=len(attendance._moving_path)
 
         self._hotel_lift.drop_pick_up_attendance()
 
         for lift in self._lifts.values():
-            lift.perform_move()
+            lift.perform_move(self._time)
 
         self._lift_queue.move_immediate()
+
+        self._time+=1
+
+        print("Total Attendance: {}".format(len(self._attendance)))
+        print("Attendance schedules: {}".format(attendance_move_schedule))
+        print("Attendance moving path: {}".format(attendance_moving_path))
+
+        # check if all the attendance don't have queue anymore
+        if attendance_moving_path == 0 and attendance_move_schedule == len(self._attendance):
+            self._status="finish"
 
     def run_simulation(self):
         while self._status == "start":
@@ -1587,6 +1636,12 @@ class SimulationHelper():
             self.simulate_timer()
             time.sleep(self._interval)
         # print(self._status)
+
+        if self._status == "finish":
+            print("Simulation Finished, Check the output file")
+            if self._break_enable:
+                self._listener.stop()
+            exit()
 
         """
         print(self._status)
@@ -1601,10 +1656,13 @@ class SimulationHelper():
         self.start()
         # self._thread.start()
 
-        with keyboard.Listener(
-                on_press=self.on_press,
-                on_release=self.on_release) as listener:
-            listener.join()
+        if self._break_enable:
+            with keyboard.Listener(
+                    on_press=self.on_press,
+                    on_release=self.on_release) as listener:
+                self._listener = listener
+                listener.join()
+
             # check stop signal
 
             # self._thread.join()
@@ -1629,9 +1687,9 @@ class SimulationHelper():
 # configuration
 number_of_floor = 20
 
-custom_floor = [0, 10]
+custom_floor = [0, 1, 2, 10]
 custom_floor.extend(range(11, number_of_floor))
-custom_speed = [10]
+custom_speed = [1, 1, 7]
 custom_speed.extend([1 for x in range(10, number_of_floor - 1)])
 
 lift_floor_configuration = {
@@ -1660,30 +1718,96 @@ rooms_floor_count = {
 
 # the schedule configuration for each person
 # a list of tuple contains from position and waiting time until next move in seconds
-schedule_1 = [("room", 14400), ("outside", 10800), ("dining", 3600), ("room", 0)]
-schedule_2 = [("outside", 3600), ("dining", 3600), ("room", 0)]
-schedule_3 = [("room", 3600), ("dining", 1800), ("conference", 3600), ("room", 0)]
+schedule_1 = [("room", 600), ("outside", 900), ("dining", 1800), ("room", 0)]
+schedule_2 = [("outside", 1800), ("dining", 900), ("room", 0)]
+schedule_3 = [("room", 900), ("dining", 1800), ("conference", 600), ("room", 0)]
 
 normal_schedule_list = [(schedule_1, 0.5), (schedule_2, 0.3), (schedule_3, 0.2)]
 
 # evacuation schedule
-evac_schedule = [([("room", 5), ("outside", 0)], 1)]
+evac_schedule = [([("room", 900), ("outside", 0)], 1)]
 
 # registration_schedule
-batch_registration_schedule = [([("outside", 1800), ("room", 0)], 1)]
+batch_registration_schedule = [([("outside", 300), ("room", 0)], 1)]
 
 # HotelFloor(rooms_floor_count,room_types)
 random_generator = RandomMovementGenerator(person={"move_time": 14400, "outside_time": 3600},
                                            lift={"max_waiting_time": 10, "sigma": 5})
 
-hotel = HotelLift(20, 4, rooms_floor_count, room_types, random_generator=random_generator)
+"""
+# Evacuate Simulation For 30 percent occupancy
+hotel = HotelLift(20, 4, rooms_floor_count, room_types, random_generator=random_generator, lift_log = "evacuate_lift_30.log")
 # print(hotel)
-len(hotel.rooms)
-
+#len(hotel.rooms)
 lift_queue = HotelLiftQueue(hotel_lift=hotel)
-simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=0.8, move_time=200, outside_time=100,
-                            random_generator=random_generator, lift_queue=lift_queue, schedule=normal_schedule_list)
 
-helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue=lift_queue, interval=0.1)
+simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=0.3, move_time=200, outside_time=100,
+                            random_generator=random_generator, lift_queue=lift_queue, schedule=evac_schedule, attendance_log = "evacuate_attendance_30.log")
+"""
+"""
+# Evacuate Simulation For 50 percent occupancy
+room_occupancy = 0.5
+lift_log = "evacuate_lift_50.log"
+attendance_log = "evacuate_attendance_50.log"
+scenario = evac_schedule
+
+# Evacuate Simulation For 80 percent occupancy
+room_occupancy = 0.8
+lift_log = "evacuate_lift_80.log"
+attendance_log = "evacuate_attendance_80.log"
+scenario = evac_schedule
+
+# Evacuate Simulation For 100 percent occupancy
+room_occupancy = 1
+lift_log = "evacuate_lift_100.log"
+attendance_log = "evacuate_attendance_100.log"
+scenario = evac_schedule
+"""
+
+"""
+# batch registration simulation
+scenario = batch_registration_schedule
+"""
+
+"""
+room_occupancy = 0.3
+lift_log = "batch_reg_lift_30.log"
+attendance_log = "batch_reg_attendance_30.log"
+
+# Batch Reg Simulation For 50 percent occupancy
+room_occupancy = 0.5
+lift_log = "batch_reg_lift_50.log"
+attendance_log = "batch_reg_attendance_50.log"
+
+# Batch Reg Simulation For 80 percent occupancy
+room_occupancy = 0.8
+lift_log = "batch_reg_lift_80.log"
+attendance_log = "batch_reg_attendance_80.log"
+
+# Batch Reg Simulation For 100 percent occupancy
+room_occupancy = 1
+lift_log = "batch_reg_lift_100.log"
+attendance_log = "batch_reg_attendance_100.log"
+"""
+
+# batch registration simulation
+scenario = normal_schedule_list
+
+
+room_occupancy = 1
+lift_log = "var_lift_100.log"
+attendance_log = "var_attendance_100.log"
+
+
+hotel = HotelLift(20, 4, rooms_floor_count, room_types, random_generator=random_generator, lift_log = lift_log)
+# print(hotel)
+#len(hotel.rooms)
+lift_queue = HotelLiftQueue(hotel_lift=hotel)
+
+simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=room_occupancy, move_time=200, outside_time=100,
+                            random_generator=random_generator, lift_queue=lift_queue, schedule=scenario, attendance_log = attendance_log)
+
+
+helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue=lift_queue, interval=0.01,break_enable=False)
 
 helper.run()
