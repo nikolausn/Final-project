@@ -1641,7 +1641,7 @@ class SimulationHelper():
             print("Simulation Finished, Check the output file")
             if self._break_enable:
                 self._listener.stop()
-            exit()
+            #exit()
 
         """
         print(self._status)
@@ -1718,17 +1718,17 @@ rooms_floor_count = {
 
 # the schedule configuration for each person
 # a list of tuple contains from position and waiting time until next move in seconds
-schedule_1 = [("room", 600), ("outside", 900), ("dining", 1800), ("room", 0)]
-schedule_2 = [("outside", 1800), ("dining", 900), ("room", 0)]
-schedule_3 = [("room", 900), ("dining", 1800), ("conference", 600), ("room", 0)]
+schedule_1 = [("room", 300), ("outside", 400), ("dining", 900), ("room", 0)]
+schedule_2 = [("outside", 900), ("dining", 400), ("room", 0)]
+schedule_3 = [("room", 400), ("dining", 900), ("conference", 300), ("room", 0)]
 
 normal_schedule_list = [(schedule_1, 0.5), (schedule_2, 0.3), (schedule_3, 0.2)]
 
 # evacuation schedule
-evac_schedule = [([("room", 900), ("outside", 0)], 1)]
+evac_schedule = [([("room", 60), ("outside", 0)], 1)]
 
 # registration_schedule
-batch_registration_schedule = [([("outside", 300), ("room", 0)], 1)]
+batch_registration_schedule = [([("outside", 60), ("room", 0)], 1)]
 
 # HotelFloor(rooms_floor_count,room_types)
 random_generator = RandomMovementGenerator(person={"move_time": 14400, "outside_time": 3600},
@@ -1791,23 +1791,22 @@ attendance_log = "batch_reg_attendance_100.log"
 """
 
 # batch registration simulation
-scenario = normal_schedule_list
+simulation_list = [(10,0.1),(20,0.2),(30,.3),(40,.4),(50,.5),(60,.6),(70,.7),(80,.8),(90,.9),(100,1)]
+for sim in simulation_list:
+    scenario = normal_schedule_list
+    room_occupancy = sim[1]
+    lift_log = "normal_sched_all_lift_{}.log".format(sim[0])
+    attendance_log = "normal_sched_all_attendance_{}.log".format(sim[0])
 
 
-room_occupancy = 1
-lift_log = "var_lift_100.log"
-attendance_log = "var_attendance_100.log"
+    hotel = HotelLift(20, 4, rooms_floor_count, room_types, random_generator=random_generator, lift_log = lift_log)
+    # print(hotel)
+    #len(hotel.rooms)
+    lift_queue = HotelLiftQueue(hotel_lift=hotel)
 
+    simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=room_occupancy, move_time=200, outside_time=100,
+                                random_generator=random_generator, lift_queue=lift_queue, schedule=scenario, attendance_log = attendance_log)
 
-hotel = HotelLift(20, 4, rooms_floor_count, room_types, random_generator=random_generator, lift_log = lift_log)
-# print(hotel)
-#len(hotel.rooms)
-lift_queue = HotelLiftQueue(hotel_lift=hotel)
+    helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue=lift_queue, interval=0.01,break_enable=False)
 
-simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=room_occupancy, move_time=200, outside_time=100,
-                            random_generator=random_generator, lift_queue=lift_queue, schedule=scenario, attendance_log = attendance_log)
-
-
-helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue=lift_queue, interval=0.01,break_enable=False)
-
-helper.run()
+    helper.run()
