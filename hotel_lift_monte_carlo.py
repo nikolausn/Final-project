@@ -7,14 +7,16 @@ from pynput import keyboard
 import threading
 import time
 import typing
+import json
+import argparse
+import sys
 
-logging.getLogger().setLevel(logging.DEBUG)
-logging.debug("TEST")
-
+"""
 # make a rules using graph network
 lift_number = 5
 number_of_floor = 20
 conference_room_floor = 2
+"""
 
 
 # define the class Person, Attendance, and Room for name requirement
@@ -351,7 +353,8 @@ class Lift(CapacityLimit):
         self._attendance_number = 0
         self._max_waiting_time = max_waiting_time
         self._timer = 0
-        self._attendance: typing.List[Attendance] = []
+        #self._attendance: typing.List[Attendance] = []
+        self._attendance = []
         self._lift_log = lift_log
 
         # variables for moving act
@@ -830,7 +833,7 @@ class HotelLiftQueue():
 
         #print("busy_queue_up: {}".format(busy_queue_up))
         #print("busy_queue_down: {}".format(busy_queue_down))
-        print("busy_queue: {}".format(busy_queue))
+        logging.info("busy_queue: {}".format(busy_queue))
 
         for queue_tuple in busy_queue:
             if queue_tuple[1] > 0:
@@ -1060,6 +1063,7 @@ class Attendance(Person):
                     file.write(",".join([str(x) for x in
                                          [self.name, self._start_time, time_tick, self._from_floor, self._target_floor, self._waiting_lift_time,
                                           self._in_lift_time, total_time]]) + "\n")
+                    logging.info("att: {}, go from: {}, to: {}, in {} s".format(self.name,self._from_floor,self._target_floor,total_time))
 
                 self._target_floor = ""
                 self._from_floor = ""
@@ -1188,7 +1192,8 @@ class InitialGenerator():
         self._room_stack = room_stack
         logging.debug(occupied_index)
         # occupied = [room_stack[x] for x in occupied_index]
-        self._attendance: typing.List[Attendance] = []
+        #self._attendance: typing.List[Attendance] = []
+        self._attendance = []
         number = 0
         for i in occupied_index:
             room = room_stack[i]
@@ -1307,9 +1312,9 @@ class SimulationHelper():
 
         self._time+=1
 
-        print("Total Attendance: {}".format(len(self._attendance)))
-        print("Attendance schedules: {}".format(attendance_move_schedule))
-        print("Attendance moving path: {}".format(attendance_moving_path))
+        logging.debug("Total Attendance: {}".format(len(self._attendance)))
+        logging.debug("Attendance schedules: {}".format(attendance_move_schedule))
+        logging.debug("Attendance moving path: {}".format(attendance_moving_path))
 
         # check if all the attendance don't have queue anymore
         if attendance_moving_path == 0 and attendance_move_schedule == len(self._attendance):
@@ -1436,63 +1441,72 @@ import json
 with open("config.json","w") as file:
     json.dump(configuration,file)
 """
-import json
-with open("config.json","r") as file:
-    configuration = json.load(file)
 
-room_types = {}
-room_types_capacity = configuration["room_types_capacity"]
-for room in room_types_capacity:
-    room_types[room]= RoomType(room,room_types_capacity[room])
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Hotel Lift Simulation Data Generator')
+    parser.add_argument('-c','--config_file',
+                        help='Specify configuration file for Hotel Lift Simulation, check the format in Documentation')
+    parser.add_argument('-l','--logging', default="info",
+                        help='Logging level for our simulation, default: info. can be (info,debug,warning)')
+    args = parser.parse_args()
 
-number_of_floor =configuration["number_of_floor"]
-simulation_list = configuration["simulation_list"]
-scenario = configuration["scenario"]
-rooms_floor_count = configuration["rooms_floor_count"]
-attendance_log_name = configuration["attendance_log_name"]
-lift_log_name = configuration["lift_log_name"]
-rooms_floor_count = configuration["rooms_floor_count"]
-simulation_list = configuration["simulation_list"]
-lift_floor_configuration = configuration["lift_floor_configuration"]
-thread_idle = configuration["thread_idle"]
+    if len(sys.argv) == 1:
+        # print help if the configuration file is not presented
+        parser.print_help()
+        sys.exit(1)
 
+    log_key = {
+        "info": logging.INFO,
+        "debug": logging.DEBUG,
+        "warning": logging.WARNING
+    }
 
-for sim in simulation_list:
-    room_occupancy = sim[1]
-    lift_log = lift_log_name.format(sim[0])
-    attendance_log = attendance_log_name.format(sim[0])
+    logging.getLogger().setLevel(log_key[args.logging])
+    logging.debug("TEST DEBUG")
+    logging.info("TEST INFO")
+    logging.warning("TEST WARNING")
 
+    with open(args.config_file,"r") as file:
+        configuration = json.load(file)
 
-    hotel = HotelLift(number_of_floor, lift_floor_configuration, rooms_floor_count, room_types, lift_log = lift_log)
-    # print(hotel)
-    #len(hotel.rooms)
-    lift_queue = HotelLiftQueue(hotel_lift=hotel)
+    room_types = {}
+    room_types_capacity = configuration["room_types_capacity"]
+    for room in room_types_capacity:
+        room_types[room]= RoomType(room,room_types_capacity[room])
 
-    simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=room_occupancy, move_time=200, outside_time=100,
-                                lift_queue=lift_queue, schedule=scenario, attendance_log = attendance_log)
-
-    helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue=lift_queue, interval=thread_idle,break_enable=False)
-
-    helper.run()
-
-
-"""
-for sim in simulation_list:
-    scenario = evac_schedule
-    room_occupancy = sim[1]
-    lift_log = "normal_sched_all_lift_{}.log".format(sim[0])
-    attendance_log = "normal_sched_all_attendance_{}.log".format(sim[0])
+    number_of_floor =configuration["number_of_floor"]
+    simulation_list = configuration["simulation_list"]
+    scenario = configuration["scenario"]
+    rooms_floor_count = configuration["rooms_floor_count"]
+    attendance_log_name = configuration["attendance_log_name"]
+    lift_log_name = configuration["lift_log_name"]
+    rooms_floor_count = configuration["rooms_floor_count"]
+    simulation_list = configuration["simulation_list"]
+    lift_floor_configuration = configuration["lift_floor_configuration"]
+    thread_idle = configuration["thread_idle"]
 
 
-    hotel = HotelLift(20, 4, rooms_floor_count, room_types, lift_log = lift_log)
-    # print(hotel)
-    #len(hotel.rooms)
-    lift_queue = HotelLiftQueue(hotel_lift=hotel)
+    for sim in simulation_list:
 
-    simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=room_occupancy, move_time=200, outside_time=100,
-                                lift_queue=lift_queue, schedule=scenario, attendance_log = attendance_log)
+        room_occupancy = sim[1]
+        lift_log = lift_log_name.format(sim[0])
+        attendance_log = attendance_log_name.format(sim[0])
 
-    helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue=lift_queue, interval=0.01,break_enable=False)
+        # replace the log file
+        with open(lift_log,"w") as file:
+            pass
+        with open(attendance_log,"w") as file:
+            pass
 
-    helper.run()
-"""
+        hotel = HotelLift(number_of_floor, lift_floor_configuration, rooms_floor_count, room_types, lift_log = lift_log)
+        # print(hotel)
+        #len(hotel.rooms)
+        lift_queue = HotelLiftQueue(hotel_lift=hotel)
+
+        simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=room_occupancy, move_time=200, outside_time=100,
+                                    lift_queue=lift_queue, schedule=scenario, attendance_log = attendance_log)
+
+        helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue=lift_queue, interval=thread_idle,break_enable=False)
+
+        helper.run()
+
