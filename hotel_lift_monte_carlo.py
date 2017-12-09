@@ -660,7 +660,7 @@ class HotelLift():
     is a class that combining the HotelFloor and the Lift, it also can be called as a simple hotel class
     """
 
-    def __init__(self, number_of_floor: int, number_of_lift: int, rooms_floor_count, room_types: dict,
+    def __init__(self, number_of_floor: int, lift_floor_configuration: dict, rooms_floor_count, room_types: dict,
                 lift_log="lift.log"):
         """
         give number of floor, room_types, and rooms_floor_count configuration
@@ -972,8 +972,8 @@ class Attendance(Person):
 
         self._move_time = move_time
         self._outside_time = outside_time
-        self._random_move_time = GaussianDist(mu=move_time, sigma=move_time / 2, low=0, high=move_time * 2)
-        self._random_outside_time = GaussianDist(mu=outside_time, sigma=outside_time / 2, low=0, high=outside_time * 2)
+        self._random_move_time = GaussianDist(mu=move_time, sigma=move_time / 2, low=0, high=move_time)
+        self._random_outside_time = GaussianDist(mu=outside_time, sigma=outside_time / 2, low=0, high=outside_time)
         self._next_move = 0
         self._waiting_lift_time = 0
         self._in_lift_time = 0
@@ -999,10 +999,10 @@ class Attendance(Person):
         self._room = room
 
     def call_lift(self):
-        lift_queue.call_lift_priority(self._position, self._target)
+        self._lift_queue.call_lift_priority(self._position, self._target)
 
     def go_lift(self):
-        lift_queue.go_lift(self._target)
+        self._lift_queue.go_lift(self._target)
 
     @property
     def move_time(self):
@@ -1140,7 +1140,7 @@ class Attendance(Person):
                 self._position = action_now[0]
                 # only if the schedule has next move
                 self._next_move = GaussianDiscrete(mu=action_now[1], sigma=2 / 3 * action_now[1], low=0,
-                                                   high=2 * action_now[1]).random()
+                                                   high=action_now[1]).random()
                 if self._start_time == None:
                     self._start_time = self._time_tick + self._next_move
                 # next position
@@ -1369,7 +1369,8 @@ class SimulationHelper():
         print(self._status)
 
 
-# configuration
+# configuration maker
+"""
 number_of_floor = 20
 
 custom_floor = [0, 1, 2, 10]
@@ -1379,20 +1380,18 @@ custom_speed.extend([1 for x in range(10, number_of_floor - 1)])
 
 lift_floor_configuration = {
     # speed 1 for every floor
-    0: {"floor": range(0, number_of_floor), "speed": [1 for x in range(number_of_floor - 1)]},
-    1: {"floor": range(0, number_of_floor), "speed": [1 for x in range(number_of_floor - 1)]},
-    2: {"floor": range(0, int(number_of_floor / 2)), "speed": [1 for x in range(0, int(number_of_floor / 2) - 1)]},
-    3: {"floor": range(0, int(number_of_floor / 2)), "speed": [1 for x in range(0, int(number_of_floor / 2) - 1)]},
+    0: {"floor": list(range(0, number_of_floor)), "speed": [1 for x in range(number_of_floor - 1)]},
+    1: {"floor": list(range(0, number_of_floor)), "speed": [1 for x in range(number_of_floor - 1)]},
+    2: {"floor": list(range(0, int(number_of_floor / 2))), "speed": [1 for x in range(0, int(number_of_floor / 2) - 1)]},
+    3: {"floor": list(range(0, int(number_of_floor / 2))), "speed": [1 for x in range(0, int(number_of_floor / 2) - 1)]},
     4: {"floor": custom_floor, "speed": custom_speed},
     5: {"floor": custom_floor, "speed": custom_speed}
 }
 
-room_types_list = ["single", "double", "deluxe"]
-
-room_types = {
-    "single": RoomType("single", 2),
-    "double": RoomType("double", 2),
-    "deluxe": RoomType("deluxe", 4),
+room_types_capacity = {
+    "single": 2,
+    "double": 2,
+    "deluxe": 4
 }
 
 rooms_floor_count = {
@@ -1419,6 +1418,65 @@ batch_registration_schedule = [([("outside", 60), ("room", 0)], 1)]
 
 # batch registration simulation
 simulation_list = [(10,0.1),(20,0.2),(30,.3),(40,.4),(50,.5),(60,.6),(70,.7),(80,.8),(90,.9),(100,1)]
+
+# make the configuration file
+configuration = {
+    'number_of_floor': number_of_floor,
+    'lift_floor_configuration': lift_floor_configuration,
+    'room_types_capacity': room_types_capacity,
+    'rooms_floor_count': rooms_floor_count,
+    'scenario': normal_schedule_list,
+    'simulation_list': simulation_list,
+    'attendance_log_name': "normal_sched_all_lift_{}.log",
+    'lift_log_name': "normal_sched_all_lift_{}.log",    
+    'iteration': 1
+}
+
+import json
+with open("config.json","w") as file:
+    json.dump(configuration,file)
+"""
+import json
+with open("config.json","r") as file:
+    configuration = json.load(file)
+
+room_types = {}
+room_types_capacity = configuration["room_types_capacity"]
+for room in room_types_capacity:
+    room_types[room]= RoomType(room,room_types_capacity[room])
+
+number_of_floor =configuration["number_of_floor"]
+simulation_list = configuration["simulation_list"]
+scenario = configuration["scenario"]
+rooms_floor_count = configuration["rooms_floor_count"]
+attendance_log_name = configuration["attendance_log_name"]
+lift_log_name = configuration["lift_log_name"]
+rooms_floor_count = configuration["rooms_floor_count"]
+simulation_list = configuration["simulation_list"]
+lift_floor_configuration = configuration["lift_floor_configuration"]
+thread_idle = configuration["thread_idle"]
+
+
+for sim in simulation_list:
+    room_occupancy = sim[1]
+    lift_log = lift_log_name.format(sim[0])
+    attendance_log = attendance_log_name.format(sim[0])
+
+
+    hotel = HotelLift(number_of_floor, lift_floor_configuration, rooms_floor_count, room_types, lift_log = lift_log)
+    # print(hotel)
+    #len(hotel.rooms)
+    lift_queue = HotelLiftQueue(hotel_lift=hotel)
+
+    simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=room_occupancy, move_time=200, outside_time=100,
+                                lift_queue=lift_queue, schedule=scenario, attendance_log = attendance_log)
+
+    helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue=lift_queue, interval=thread_idle,break_enable=False)
+
+    helper.run()
+
+
+"""
 for sim in simulation_list:
     scenario = evac_schedule
     room_occupancy = sim[1]
@@ -1437,3 +1495,4 @@ for sim in simulation_list:
     helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue=lift_queue, interval=0.01,break_enable=False)
 
     helper.run()
+"""
