@@ -31,33 +31,6 @@ class Room:
     pass
 
 
-class RandomMovementGenerator():
-    """
-    initiate random movement for target object
-    since generating random in the object will
-    result in the same value (same seed)
-    This class should be a singleton, but I think we don't need to use this since we add
-    the implementation in the object level
-    """
-
-    def __init__(self, person, lift):
-        self._random_move_time = GaussianDist(mu=person["move_time"], sigma=person["move_time"] / 2, low=1,
-                                              high=person["move_time"] * 2)
-        self._random_outside_time = GaussianDist(mu=person["outside_time"], sigma=person["outside_time"] / 2, low=1,
-                                                 high=person["outside_time"] * 2)
-        self._random_close_door = GaussianDist(mu=lift["max_waiting_time"] / 2, sigma=lift["sigma"], low=1,
-                                               high=lift["max_waiting_time"])
-
-    def random_move_time(self):
-        return self._random_move_time.random()
-
-    def random_outside_time(self):
-        return self._random_outside_time.random()
-
-    def gen_close_door(self):
-        return math.ceil(self._random_close_door.random())
-
-
 class RoomType:
     """
     RoomType is a base class of a room class,
@@ -358,7 +331,7 @@ class Lift(CapacityLimit):
     """
     _status_list = ["go_up", "go_down", "idle"]
 
-    def __init__(self, name: str, random_generator: RandomMovementGenerator, average_speed: int = 1,
+    def __init__(self, name: str, average_speed: int = 1,
                  floor_configuration: dict = {}, capacity: int = 0, position: int = 0,
                  max_waiting_time: int = 10,lift_log:str="lift.log"):
         """
@@ -397,8 +370,6 @@ class Lift(CapacityLimit):
         # it should use skewed distribution
         # This will effect the lift door closing time
         self._random_gauss = GaussianDist(mu=self.max_waiting_time / 2, sigma=5, low=2, high=self.max_waiting_time)
-
-        self._random_generator = random_generator
 
         if len(floor_configuration) > 0:
             # floor configuration is exist
@@ -510,13 +481,6 @@ class Lift(CapacityLimit):
         :return: target floor
         """
 
-        """
-        edge = self.graph.edge[self.position]
-        for target_node in edge:
-            if edge[target_node]["attr"]["dir"] == "up":
-                self.position = target_node
-        return self.position
-        """
         edge = self.graph.edge[self.position]
         for target_node in edge:
             # logging.debug("Target Node: {}".format(target_node))
@@ -534,13 +498,6 @@ class Lift(CapacityLimit):
         :return: target_floor
         """
 
-        """
-        edge = self.graph.edge[self.position]
-        for target_node in edge:
-            if edge[target_node]["attr"]["dir"] == "down":
-                self.position = target_node
-        return self.position
-        """
         edge = self.graph.edge[self.position]
         for target_node in edge:
             if edge[target_node]["attr"]["dir"] == "down":
@@ -580,13 +537,6 @@ class Lift(CapacityLimit):
                 #if self._status == direction and self._next_move == "":
                 if self._status == direction and not self._just_imediate:
                     self._call_floor.append(floor)
-
-            """
-            if self._status == "up":
-                self.go_up()
-            else:
-                self.go_down()
-            """
 
     def goto(self, floor):
         """
@@ -711,7 +661,7 @@ class HotelLift():
     """
 
     def __init__(self, number_of_floor: int, number_of_lift: int, rooms_floor_count, room_types: dict,
-                 random_generator: RandomMovementGenerator, lift_log="lift.log"):
+                lift_log="lift.log"):
         """
         give number of floor, room_types, and rooms_floor_count configuration
         The class will generate all the Object needed based on configuration
@@ -739,19 +689,7 @@ class HotelLift():
             # logging.debug(x)
             config = lift_floor_configuration[x]
             self.lifts[x] = Lift(name=x, floor_configuration=config, capacity=20, position=0,
-                                 random_generator=random_generator,lift_log=lift_log)
-
-        """
-        for x in range(number_of_lift):
-            lift = Lift(x,20,0)
-            for y in range(number_of_floor):
-                lift.graph.add_node(y)
-                if y > 0:
-                    lift.graph.add_edge(y-1,y)
-                    lift.graph.add_edge(y,y-1)
-
-            self._lifts.append(lift)     
-        """
+                                 lift_log=lift_log)
 
     @property
     def lifts(self) -> typing.Dict[str, Lift]:
@@ -848,56 +786,6 @@ class HotelLiftQueue():
     def hotel_lift(self) -> HotelLift:
         return self._hotel_lift
 
-    def call_lift(self, att: Attendance, floor: str, target: str):
-        """
-        The function will activate the lift by calling it
-        and append the floor to the called_stack lift
-
-        :param att: Attendance for the floor lift stack
-        :param floor: from where this lift called
-        :param target: to where the person want to go to
-        :return:
-        """
-        # if att not in self._hotel_floor[int(floor)].lift_queue:
-        #    self._hotel_floor[int(floor)].lift_queue.append(att)
-        # initialize lift_path to check the shortest lift_path
-        lift_path = [x for x in range(len(self.hotel_lift.floors) * 2)]
-        lift_call = None
-        direction = None
-
-        for lift in self.hotel_lift.lifts.values():
-            try:
-                path = nx.shortest_path(lift._graph, floor, target)
-                direction = lift._graph.edge[path[0]][path[1]]["attr"]["dir"]
-                # check the shortest path for the lift
-                lift_to_pos = nx.shortest_path(lift._graph, lift._position, floor)
-                lift_to_pos_dir = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
-                if lift._status == "idle":
-                    if len(lift_path) > len(lift_to_pos_dir):
-                        lift_path = lift_to_pos_dir
-                        lift_call = lift
-                elif lift_to_pos_dir == lift._status and lift._door_open:
-                    if len(lift_path) > len(lift_to_pos_dir):
-                        lift_path = lift_to_pos_dir
-                        lift_call = lift
-                if lift_call != None:
-                    lift.call(floor, direction)
-            except BaseException as ex:
-                path = []
-
-        if direction == "up":
-            if att not in self.hotel_lift.floors[floor].lift_queue_up:
-                self.hotel_lift.floors[floor].lift_queue_up.append(att)
-        elif direction == "down":
-            if att not in self.hotel_lift.floors[floor].lift_queue_down:
-                self.hotel_lift.floors[floor].lift_queue_down.append(att)
-
-        return (lift_call, lift_path, direction)
-        """
-        for lift in self._hotel_lift.lifts.values():
-            if lift._status == "idle":
-        """
-
     def call_lift_priority(self, att: Attendance, floor: str, target: str):
         """
         Call the lift using the priority queue in each floor
@@ -928,31 +816,12 @@ class HotelLiftQueue():
 
     def move_immediate(self):
         # check the busiest floor
-        # busy_up = None
-        # busy_down = None
-
-        # len_busy_up = 0
-        # len_busy_down = 0
-
-        # make a list of tuple queue
-        #busy_queue_up = []
-        #busy_queue_down = []
         busy_queue = []
 
         for floor in self.hotel_lift.floors:
-            #busy_queue_up.append((floor, len(floor.lift_queue_up)))
-            #busy_queue_down.append((floor, len(floor.lift_queue_down)))
-
+            #combine the up queue and down queue together for priority choosing
             busy_queue.append((floor,len(floor.lift_queue_up),"up"))
             busy_queue.append((floor, len(floor.lift_queue_down), "down"))
-            """
-            if len(floor.lift_queue_up) > len_busy_up:
-                len_busy_up = len(floor.lift_queue_up)
-                busy_up = floor
-            if len(floor.lift_queue_down) > len_busy_down:
-                len_busy_down = len(floor.lift_queue_down)
-                busy_down = floor
-            """
 
         # sort the busy queue based on the attendance
         #busy_queue_up = sorted(busy_queue_up, key=lambda x: x[1])[::-1]
@@ -983,21 +852,6 @@ class HotelLiftQueue():
                                 lift._status = queue_tuple[2]
                                 break
                                 #lift_call_up = lift
-                        """
-                        else:
-                            # immediate open
-                            if not lift._door_open and lift.attendance < lift.capacity:
-                                lift._timer+=lift.gen_close_door()
-                                lift._status = "up"
-                                break
-                        """
-
-                        """
-                        if busy_down!=None:
-                            lift_to_pos = nx.shortest_path(lift._graph, lift._position, busy_down.floor_name)
-                            #if len(lift_to_pos) > 1:
-                            lift_to_pos_down = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
-                        """
 
                         if lift._status == "idle":
                             if len(lift_path_up) > len(lift_to_pos):
@@ -1008,17 +862,6 @@ class HotelLiftQueue():
                                 lift_path_up = lift_to_pos
                                 lift_call_up = lift
 
-                        """
-                        if busy_down!=None:
-                            if lift._status == "idle":
-                                if len(lift_path_down) > len(lift_to_pos_down):
-                                    lift_path_down = lift_to_pos_down
-                                    lift_call_down = lift
-                            elif lift_to_pos_down == lift._status:
-                                if len(lift_path_down) > len(lift_to_pos_down):
-                                    lift_path_down = lift_to_pos_down
-                                    lift_call_down = lift
-                        """
                     except BaseException as ex:
                         # print(ex)
                         pass
@@ -1030,141 +873,13 @@ class HotelLiftQueue():
                 if lift_call_up != None:
                     lift_call_up.call(floor.floor_name, queue_tuple[2])
 
-        '''
-        for queue_tuple in busy_queue_up:
-            if queue_tuple[1] > 0:
-                floor = queue_tuple[0]
-                lift_path_up = [x for x in range(len(self.hotel_lift.floors) * 2)]
-                # lift_path_down = [x for x in range(len(self.hotel_lift.floors) * 2)]
-                direction = None
-                lift_call_up = None
-                # lift_call_down = None
-                for lift in self.hotel_lift.lifts.values():
-                    try:
-                        lift_to_pos = nx.shortest_path(lift._graph, lift._position, floor.floor_name)
-                        # print(lift_to_pos)
-                        if len(lift_to_pos) > 1:
-                            lift_to_pos_up = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
-                        else:
-                            if lift.attendance < lift.capacity and lift._just_imediate:
-                                lift_call_up = lift
-                        """
-                        else:
-                            # immediate open
-                            if not lift._door_open and lift.attendance < lift.capacity:
-                                lift._timer+=lift.gen_close_door()
-                                lift._status = "up"
-                                break
-                        """
-
-                        """
-                        if busy_down!=None:
-                            lift_to_pos = nx.shortest_path(lift._graph, lift._position, busy_down.floor_name)
-                            #if len(lift_to_pos) > 1:
-                            lift_to_pos_down = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
-                        """
-
-                        if lift._status == "idle":
-                            if len(lift_path_up) > len(lift_to_pos):
-                                lift_path_up = lift_to_pos
-                                lift_call_up = lift
-                        elif "up" == lift._status and lift_to_pos_up == lift._status:
-                            if len(lift_path_up) > len(lift_to_pos):
-                                lift_path_up = lift_to_pos
-                                lift_call_up = lift
-
-                        """
-                        if busy_down!=None:
-                            if lift._status == "idle":
-                                if len(lift_path_down) > len(lift_to_pos_down):
-                                    lift_path_down = lift_to_pos_down
-                                    lift_call_down = lift
-                            elif lift_to_pos_down == lift._status:
-                                if len(lift_path_down) > len(lift_to_pos_down):
-                                    lift_path_down = lift_to_pos_down
-                                    lift_call_down = lift
-                        """
-                    except BaseException as ex:
-                        # print(ex)
-                        pass
-
-                #print("lift to pos up: {}".format(lift_to_pos_up))
-                #print("lift._status: {}".format(lift._status))
-
-                # print(lift_call_up)
-                if lift_call_up != None:
-                    lift_call_up.call(floor.floor_name, "up")
-
-        for queue_tuple in busy_queue_down:
-            if queue_tuple[1] > 0 :
-                floor = queue_tuple[0]
-                lift_path_up = [x for x in range(len(self.hotel_lift.floors) * 2)]
-                # lift_path_down = [x for x in range(len(self.hotel_lift.floors) * 2)]
-                direction = None
-                lift_call_up = None
-                # lift_call_down = None
-                for lift in self.hotel_lift.lifts.values():
-                    try:
-                        lift_to_pos = nx.shortest_path(lift._graph, lift._position, floor.floor_name)
-                        # print(lift_to_pos)
-                        if len(lift_to_pos) > 1:
-                            lift_to_pos_up = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
-                        else:
-                            if lift.attendance < lift.capacity and lift._just_imediate:
-                                lift_call_up = lift
-                        """
-                        else:
-                            if not lift._door_open and lift.attendance < lift.capacity:
-                                lift._timer+=lift.gen_close_door()
-                                lift._status = "down"
-                                break
-                        """
-
-                        """
-                        if busy_down!=None:
-                            lift_to_pos = nx.shortest_path(lift._graph, lift._position, busy_down.floor_name)
-                            #if len(lift_to_pos) > 1:
-                            lift_to_pos_down = lift._graph.edge[lift_to_pos[0]][lift_to_pos[1]]["attr"]["dir"]
-                        """
-
-                        if lift._status == "idle":
-                            if len(lift_path_up) > len(lift_to_pos):
-                                lift_path_up = lift_to_pos
-                                lift_call_up = lift
-                        elif "down" == lift._status and lift_to_pos_up == lift._status:
-                            if len(lift_path_up) > len(lift_to_pos):
-                                lift_path_up = lift_to_pos
-                                lift_call_up = lift
-
-                        """
-                        if busy_down!=None:
-                            if lift._status == "idle":
-                                if len(lift_path_down) > len(lift_to_pos_down):
-                                    lift_path_down = lift_to_pos_down
-                                    lift_call_down = lift
-                            elif lift_to_pos_down == lift._status:
-                                if len(lift_path_down) > len(lift_to_pos_down):
-                                    lift_path_down = lift_to_pos_down
-                                    lift_call_down = lift
-                        """
-                    except BaseException as ex:
-                        # print(ex)
-                        pass
-
-                #print("lift to pos down: {}".format(lift_to_pos_up))
-                #print("lift._status: {}".format(lift._status))
-
-                # print(lift_call_up)
-                if lift_call_up != None:
-                    lift_call_up.call(floor.floor_name, "down")
-            '''
 
 class Person():
     """
     Base class for the Attendance
     """
 
-    def __init__(self, name: str, move_time: int, outside_time: int, random_generator: RandomMovementGenerator,
+    def __init__(self, name: str, move_time: int, outside_time: int,
                  schedule={}, capacity_unit=1):
         """
         Define the attendance name and capacity unit of attendance
@@ -1231,7 +946,7 @@ class Attendance(Person):
     _move_graph.add_edge("in_lift", "conference")
 
     def __init__(self, room: Room, name: str, move_time: int, outside_time: int,
-                 random_generator: RandomMovementGenerator, lift_queue: HotelLiftQueue, schedule: list = [],
+                lift_queue: HotelLiftQueue, schedule: list = [],
                  capacity_unit: int = 1, attendance_log = "attendance.log"):
         """
 
@@ -1246,7 +961,7 @@ class Attendance(Person):
         how the attendance occupied the lift
         """
         Person.__init__(self, name, move_time=move_time, outside_time=outside_time, capacity_unit=capacity_unit,
-                        schedule=schedule, random_generator=random_generator)
+                        schedule=schedule)
         self._room = room
         self._lift_queue = lift_queue
 
@@ -1260,7 +975,6 @@ class Attendance(Person):
         self._random_move_time = GaussianDist(mu=move_time, sigma=move_time / 2, low=0, high=move_time * 2)
         self._random_outside_time = GaussianDist(mu=outside_time, sigma=outside_time / 2, low=0, high=outside_time * 2)
         self._next_move = 0
-        self._random_generator = random_generator
         self._waiting_lift_time = 0
         self._in_lift_time = 0
 
@@ -1357,17 +1071,6 @@ class Attendance(Person):
                 call the lift
                 """
 
-                """
-                if self._position == "room":
-                    from_where = self._room.floor.floor_name
-                elif self._position == "outside":
-                    from_where = 0
-    
-                if self._target == "room":
-                    to_where = self._room.floor.floor_name
-                elif self._target == "outside":
-                    to_where = 0
-                """
                 from_where = self.transform_place(self._position)
                 to_where = self.transform_place(self._target)
 
@@ -1381,30 +1084,12 @@ class Attendance(Person):
                     # logging.debug("Person {}, call lift {}, path: {}".format(self._name, lift, path))
 
                     self._lift_queue.call_lift_priority(self, from_where, to_where)
-
-                    """
-                    if direction == "up":
-                        if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_up:
-                            self._lift_queue.hotel_lift.floors[from_where].lift_queue_up.append(self)
-                    elif direction == "down":
-                        if self not in self._lift_queue.hotel_lift.floors[from_where].lift_queue_down:
-                            self._lift_queue.hotel_lift.floors[from_where].lift_queue_down.append(self)
-                    """
                 else:
                     self._moving_path.clear()
                     self._action = self._target
                     self._position = self._target
 
                 self._waiting_lift_time += 1
-
-                """
-                # check if there is a lift available for the attendance
-                for lift in self._lift_queue.hotel_lift.lifts.values():
-                    if lift.position == from_where:
-                        if lift._status == direction:
-                            # if the direction is the same
-                            lift.add_attendance()
-                """
 
             if self._action == "in_lift":
                 self._in_lift_time += 1
@@ -1496,7 +1181,7 @@ class InitialGenerator():
     """
 
     def __init__(self, room_stack: list, room_occupancy_pctg: float, move_time: int, outside_time: int,
-                 random_generator: RandomMovementGenerator, lift_queue: HotelLiftQueue, schedule=[],attendance_log="attendance.log"):
+                lift_queue: HotelLiftQueue, schedule=[],attendance_log="attendance.log"):
         # sample room_stack based on occupancy percentage
         total_rooms = len(room_stack)
         occupied_index = np.random.randint(total_rooms, size=np.int(room_occupancy_pctg * total_rooms))
@@ -1516,7 +1201,7 @@ class InitialGenerator():
             for j in range(number_of_attendance):
                 # create new attendance
                 new_att = Attendance(room, number, move_time=move_time, outside_time=outside_time,
-                                     random_generator=random_generator, lift_queue=lift_queue,attendance_log=attendance_log)
+                                     lift_queue=lift_queue,attendance_log=attendance_log)
                 new_att.position = "room"
                 room.attendance_checkin(new_att)
                 self._attendance.append(new_att)
@@ -1731,81 +1416,23 @@ evac_schedule = [([("room", 60), ("outside", 0)], 1)]
 batch_registration_schedule = [([("outside", 60), ("room", 0)], 1)]
 
 # HotelFloor(rooms_floor_count,room_types)
-random_generator = RandomMovementGenerator(person={"move_time": 14400, "outside_time": 3600},
-                                           lift={"max_waiting_time": 10, "sigma": 5})
-
-"""
-# Evacuate Simulation For 30 percent occupancy
-hotel = HotelLift(20, 4, rooms_floor_count, room_types, random_generator=random_generator, lift_log = "evacuate_lift_30.log")
-# print(hotel)
-#len(hotel.rooms)
-lift_queue = HotelLiftQueue(hotel_lift=hotel)
-
-simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=0.3, move_time=200, outside_time=100,
-                            random_generator=random_generator, lift_queue=lift_queue, schedule=evac_schedule, attendance_log = "evacuate_attendance_30.log")
-"""
-"""
-# Evacuate Simulation For 50 percent occupancy
-room_occupancy = 0.5
-lift_log = "evacuate_lift_50.log"
-attendance_log = "evacuate_attendance_50.log"
-scenario = evac_schedule
-
-# Evacuate Simulation For 80 percent occupancy
-room_occupancy = 0.8
-lift_log = "evacuate_lift_80.log"
-attendance_log = "evacuate_attendance_80.log"
-scenario = evac_schedule
-
-# Evacuate Simulation For 100 percent occupancy
-room_occupancy = 1
-lift_log = "evacuate_lift_100.log"
-attendance_log = "evacuate_attendance_100.log"
-scenario = evac_schedule
-"""
-
-"""
-# batch registration simulation
-scenario = batch_registration_schedule
-"""
-
-"""
-room_occupancy = 0.3
-lift_log = "batch_reg_lift_30.log"
-attendance_log = "batch_reg_attendance_30.log"
-
-# Batch Reg Simulation For 50 percent occupancy
-room_occupancy = 0.5
-lift_log = "batch_reg_lift_50.log"
-attendance_log = "batch_reg_attendance_50.log"
-
-# Batch Reg Simulation For 80 percent occupancy
-room_occupancy = 0.8
-lift_log = "batch_reg_lift_80.log"
-attendance_log = "batch_reg_attendance_80.log"
-
-# Batch Reg Simulation For 100 percent occupancy
-room_occupancy = 1
-lift_log = "batch_reg_lift_100.log"
-attendance_log = "batch_reg_attendance_100.log"
-"""
 
 # batch registration simulation
 simulation_list = [(10,0.1),(20,0.2),(30,.3),(40,.4),(50,.5),(60,.6),(70,.7),(80,.8),(90,.9),(100,1)]
 for sim in simulation_list:
-    scenario = normal_schedule_list
+    scenario = evac_schedule
     room_occupancy = sim[1]
     lift_log = "normal_sched_all_lift_{}.log".format(sim[0])
     attendance_log = "normal_sched_all_attendance_{}.log".format(sim[0])
 
 
-    hotel = HotelLift(20, 4, rooms_floor_count, room_types, random_generator=random_generator, lift_log = lift_log)
+    hotel = HotelLift(20, 4, rooms_floor_count, room_types, lift_log = lift_log)
     # print(hotel)
     #len(hotel.rooms)
     lift_queue = HotelLiftQueue(hotel_lift=hotel)
 
     simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=room_occupancy, move_time=200, outside_time=100,
-                                random_generator=random_generator, lift_queue=lift_queue, schedule=scenario, attendance_log = attendance_log)
+                                lift_queue=lift_queue, schedule=scenario, attendance_log = attendance_log)
 
     helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue=lift_queue, interval=0.01,break_enable=False)
 
