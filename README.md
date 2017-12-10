@@ -24,7 +24,7 @@ Rooms every Floors:
 - Double: 20
 - Deluxe: 10
 
-Number of Lifts: 5
+Number of Lifts: 6
 Configuration:
 - 1: floor 0 - 19, speed 1 each floor
 - 2: floor 0 - 19, speed 1 each floor
@@ -36,16 +36,15 @@ Configuration:
 The time measure in this simulation is second, so we compute every single second for each object (Lift, and Guests) to measure they spending time.
 
 Before running the simulation, I might use my hypothesis for every scenario:
-- evacuation scenario: given the occupancy of the hotel, I suggest that the lift configuration above can handle evacuation up to 50% occupancy and might get more time when the hotel occupancy is increasing.
-- bulk check-in scenario: using the configuration, I suggest this check-in scenario may produce longer waiting time when the people that using the lift is increasing as well
-- real life scenario: using a wider movement time each guest, I suspect the lifts can handle guests movement and it might produce a longer waiting time when the movement time is thinner.
-
+- evacuation scenario: there is no relation within hotel occupancy and average waiting time and average in lift time in the evacuation scneario
+- bulk check-in scenario: there is no relation within hotel occupancy and average waiting time and average in lift time in the evacuation scneario
+- normal schedule scenario: there is no relation within hotel occupancy and average waiting time and average in lift time in the normal schedule scenario.
 
 ### Simulation's variables of uncertainty
 There are several variables I used for the uncertainty:
-- movement_waiting_time: is a movement parameter to produce a random variable of a person movement. Generating this random number will trigger the movement of a person after the designated time is reached. The waiting time itself is highly configurable and distributed in a Gaussian manner which skewed 2/3 to the left of the maximum time to simulate real-life behavior. I might use different movement variables from 3 hours, 6 hours, and 12 hours maximum.
+- movement_waiting_time: is a movement parameter to produce a random variable of a person movement. Generating this random number will trigger the movement of a person after the designated time is reached. The waiting time itself is highly configurable and distributed in a Gaussian manner which skewed 2/3 to the left of the maximum time to simulate real-life behavior. The maximum waiting movement time can be configured in the json configuration file according to which schedule or what scenario we want to use
 - door_closing_time: every time a lift door open in a floor, it has generated random waiting time to wait for another guest to get into the lift. This random waiting time is useful to simulate people behavior in a lift. People often push the close door button to close the lift immediately or just leave it closed automatically (maximum time). This variable is generated using normal Gaussian distribution with half of the maximum time as the mean. For this parameter, I used 10 seconds for the maximum door closing time
-- outside_time: is a variable that an attendance used when they move out and want to back in. This variable is useful for simulating real-life people behavior which sometimes wants to go outside the hotel for some time and come back again later. Same with the movement_waiting_time, this outside_time is also skewed 2/3 to the left and only use positive values. For this movement_waiting_time, I might use different variables from 1 hour, or 3 hours maximum
+- assigned_schedule: attendances will be randomly assigned to a room and specific schedule according to the configuration file. To understand about the configuration more, look at the instructions on how to use the program
 
 ## Instructions on how to use the program:
 To use the program we can just run the script hotel_lift_monte_carlo.py and it will run the simulation using the parameter in the code (for now, and might be stored in a config file later). The program itself run in a thread, and right now it will run forever until you pause the program using Command button (in mac), or push a control-C to stop the code. The program will produce a statistic file named results.txt which is described as this example
@@ -60,7 +59,8 @@ AttendanceName,FromFloor,ToFloor,WaitingTime,InLiftTime,TotalSpendTime
 1248,14,0,1,24,25
 ```
 
-The summary statistics function will be deployed later
+## Hypothesis Testing
+
 
 ## Sources Used:
 - 9.6. random - Generate pseudo-random numbers¶. (n.d.). Retrieved November 28, 2017, from https://docs.python.org/2/library/random.html
