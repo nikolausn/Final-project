@@ -18,7 +18,6 @@ number_of_floor = 20
 conference_room_floor = 2
 """
 
-
 # define the class Person, Attendance, and Room for name requirement
 # implementation later
 class Person:
@@ -37,6 +36,13 @@ class RoomType:
     """
     RoomType is a base class of a room class,
     this class contains name and capacity to determine how many people can a room handle
+    >>> room_type = RoomType("deluxe",3)
+    >>> room_type
+    type: deluxe, capacity: 3
+    >>> room_type.name_type
+    'deluxe'
+    >>> room_type.capacity
+    3
     """
 
     def __init__(self, name_type: str, capacity: int):
@@ -50,6 +56,9 @@ class RoomType:
     @property
     def capacity(self):
         return self._capacity
+
+    def __repr__(self):
+        return "type: {}, capacity: {}".format(self.name_type,self.capacity)
 
 
 class RandomDist():
@@ -78,6 +87,9 @@ class RandomDist():
 class GaussianDist(RandomDist):
     """
     A random Gaussian Distribution generator
+    >>> gaussian_dist = GaussianDist(2,1,2,3)
+    >>> gaussian_dist.random() # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+    2...
     """
 
     def __init__(self, mu: float, sigma: float, low: float, high: float):
@@ -110,6 +122,10 @@ class GaussianDiscrete(GaussianDist):
     """
     A random Gaussian Discrete generator
     This will include all the feature that gaussian has but will return a discrete value using round
+    >>> gaussian_discrete = GaussianDiscrete(2,1,2,3)
+    >>> output = gaussian_discrete.random()
+    >>> "correct" if output == 2 or output == 3 else "incorrect"
+    'correct'
     """
 
     def __init__(self, mu: float, sigma: float, low: float, high: float):
@@ -132,9 +148,12 @@ class CapacityLimit:
     """
     A base class for defining classes that has capacity
     like Floor, Lift, Room
+    >>> capacity_limit = CapacityLimit(3)
+    >>> capacity_limit.capacity
+    3
     """
 
-    def __init__(self, capacity=0):
+    def __init__(self, capacity:int=0):
         """
         determine the capacity in the initialization
         :param capacity: capacity limit of the class
@@ -150,17 +169,32 @@ class Floor(CapacityLimit):
     """
     Floor is a base class for determining a hotel floor
     It is also inherited from the CapacityLimit
+    >>> floor = Floor("floor_1",500)
+    >>> floor.floor_name
+    'floor_1'
+    >>> floor.capacity
+    500
     """
 
-    def __init__(self, capacity=0):
+    def __init__(self, floor_name:str, capacity:int):
+        self._floor_name = floor_name
         CapacityLimit.__init__(self, capacity)
+
+    @property
+    def floor_name(self):
+        return self._floor_name
+
 
 
 class HotelFloor(Floor):
     """
     HotelFloor is a class for determining a hotel floor
+    >>> room_types = { 'normal' : RoomType('normal',2), 'deluxe': RoomType('deluxe', 4)}
+    >>> rooms_floor_count = {'normal': 10, 'deluxe': 5}
+    >>> hotel_floor = HotelFloor("floor_1",rooms_floor_count, room_types)
+    >>> hotel_floor
+    Floor: floor_1, Total Rooms: 15
     """
-
     def __init__(self, floor_name: str, rooms_floor_count: dict, room_types: dict):
         """
         Initialize the hotel floor, you must define the floor name, floor rooms
@@ -172,8 +206,8 @@ class HotelFloor(Floor):
         :param room_types: dictionary of the room types detail
         """
         self._rooms = {}
-        number = 1
-        self._floor_name = floor_name
+        number = 0
+        #self._floor_name = floor_name
 
         capacity = 0
         # initialize room type
@@ -192,7 +226,7 @@ class HotelFloor(Floor):
         self._lift_queue_up = []
         self._lift_queue_down = []
 
-        Floor.__init__(self, capacity)
+        Floor.__init__(self, floor_name, capacity)
 
     @property
     def rooms(self) -> typing.List[Room]:
@@ -201,10 +235,6 @@ class HotelFloor(Floor):
         :return: list of rooms in the floor
         """
         return self._rooms
-
-    @property
-    def floor_name(self):
-        return self._floor_name
 
     @property
     def lift_queue_up(self) -> typing.List[Attendance]:
@@ -229,28 +259,30 @@ class HotelFloor(Floor):
 class Room(RoomType):
     """
     Class of Room, inherited from the RoomType class
-    will include the HotelFloor object
+    will include room = the HotelFloor objec"101t,"deluxe
+    >>> room_types = { 'normal' : RoomType('normal',2), 'deluxe': RoomType('deluxe', 4)}
+    >>> rooms_floor_count = {'normal': 10, 'deluxe': 5}
+    >>> hotel_floor = HotelFloor("floor_1",rooms_floor_count, room_types)
+    >>> room = Room("101","deluxe",4,hotel_floor)
+    >>> room
+    Room 101, Type: deluxe, Capacity: 4, Status: empty
+    >>> room.occupied_status
+    'empty'
+    >>> person = Person("person_1",1)
+    >>> room.attendance_checkin(person)
+    >>> room.occupied_status
+    'occupied'
     """
 
-    """
-    def __init__(self,number: str,room_type: RoomType):
-        self._room_type = room_type
-        self._number = number
-
-    @property
-    def room_type(self):
-        return self._room_type
-    """
-
-    def __init__(self, number: str, name: str, capacity: int, floor: HotelFloor):
+    def __init__(self, number: str, room_type: str, capacity: int, floor: HotelFloor):
         """
         Define the room number, room type name, capacity and designated floor
         :param number: room number
-        :param name: room type name
+        :param room_type: room type name
         :param capacity: capacity of the Room
         :param floor: HotelFloor object where the room exists
         """
-        RoomType.__init__(self, name, capacity)
+        RoomType.__init__(self, room_type, capacity)
         self._number = number
         self._occupied = False
         self._attendance = []
@@ -330,10 +362,19 @@ class Room(RoomType):
 class Lift(CapacityLimit):
     """
     Lift class that describing the properties of lift and every method the lift has
+
+    >>> lift = Lift("1",{'floor': [0,1,2], 'speed': [1,1]})
+    >>> lift
+    Lift 1, capacity: 0, attendance: 0, position: 0, imm: , next_move: idle, serve: 0,1,2
+    >>> lift.go_up()
+    1
+    >>> lift.position = lift.go_up()
+    >>> lift.go_up()
+    2
     """
     _status_list = ["go_up", "go_down", "idle"]
 
-    def __init__(self, name: str, average_speed: int = 1,
+    def __init__(self, name: str,
                  floor_configuration: dict = {}, capacity: int = 0, position: int = 0,
                  max_waiting_time: int = 10,lift_log:str="lift.log"):
         """
@@ -882,8 +923,7 @@ class Person():
     Base class for the Attendance
     """
 
-    def __init__(self, name: str, move_time: int, outside_time: int,
-                 schedule={}, capacity_unit=1):
+    def __init__(self, name: str, capacity_unit=1):
         """
         Define the attendance name and capacity unit of attendance
         Different person might have different capacity unit to further
@@ -948,7 +988,7 @@ class Attendance(Person):
     _move_graph.add_edge("conference", "waiting_lift")
     _move_graph.add_edge("in_lift", "conference")
 
-    def __init__(self, room: Room, name: str, move_time: int, outside_time: int,
+    def __init__(self, room: Room, name: str,
                 lift_queue: HotelLiftQueue, schedule: list = [],
                  capacity_unit: int = 1, attendance_log = "attendance.log"):
         """
@@ -963,8 +1003,7 @@ class Attendance(Person):
         :param capacity_unit: capacity unit of an attendance, higher capacity unit will reflect on
         how the attendance occupied the lift
         """
-        Person.__init__(self, name, move_time=move_time, outside_time=outside_time, capacity_unit=capacity_unit,
-                        schedule=schedule)
+        Person.__init__(self, name, capacity_unit=capacity_unit)
         self._room = room
         self._lift_queue = lift_queue
 
@@ -973,10 +1012,10 @@ class Attendance(Person):
         # print(self._schedule_queue)
         self._attendance_log = attendance_log
 
-        self._move_time = move_time
-        self._outside_time = outside_time
-        self._random_move_time = GaussianDist(mu=move_time, sigma=move_time / 2, low=0, high=move_time)
-        self._random_outside_time = GaussianDist(mu=outside_time, sigma=outside_time / 2, low=0, high=outside_time)
+        #self._move_time = move_time
+        #self._outside_time = outside_time
+        #self._random_move_time = GaussianDist(mu=move_time, sigma=move_time / 2, low=0, high=move_time)
+        #self._random_outside_time = GaussianDist(mu=outside_time, sigma=outside_time / 2, low=0, high=outside_time)
         self._next_move = 0
         self._waiting_lift_time = 0
         self._in_lift_time = 0
@@ -1007,9 +1046,11 @@ class Attendance(Person):
     def go_lift(self):
         self._lift_queue.go_lift(self._target)
 
+    """
     @property
     def move_time(self):
         return self._move_time
+    """
 
     @property
     def next_move_schedule(self):
@@ -1155,6 +1196,8 @@ class Attendance(Person):
             else:
                 self._target = ""
         else:
+            pass
+            """
             if self._position == "room":
                 self._next_move = round(self._random_move_time.random())
                 # self._next_move = self._random_generator.random_move_time()
@@ -1165,6 +1208,7 @@ class Attendance(Person):
                 self._target = "room"
 
             self._moving_path = nx.shortest_path(self._move_graph, self._position, self._target)
+            """
 
     def set_schedule(self, schedule):
         """
@@ -1184,7 +1228,7 @@ class InitialGenerator():
     InitialGenerator is a class to generate random attendance
     """
 
-    def __init__(self, room_stack: list, room_occupancy_pctg: float, move_time: int, outside_time: int,
+    def __init__(self, room_stack: list, room_occupancy_pctg: float,
                 lift_queue: HotelLiftQueue, schedule=[],attendance_log="attendance.log"):
         # sample room_stack based on occupancy percentage
         total_rooms = len(room_stack)
@@ -1205,7 +1249,7 @@ class InitialGenerator():
             # default move, people just going back and forth within room and outside
             for j in range(number_of_attendance):
                 # create new attendance
-                new_att = Attendance(room, number, move_time=move_time, outside_time=outside_time,
+                new_att = Attendance(room, number,
                                      lift_queue=lift_queue,attendance_log=attendance_log)
                 new_att.position = "room"
                 room.attendance_checkin(new_att)
@@ -1504,7 +1548,7 @@ if __name__ == '__main__':
         #len(hotel.rooms)
         lift_queue = HotelLiftQueue(hotel_lift=hotel)
 
-        simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=room_occupancy, move_time=200, outside_time=100,
+        simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=room_occupancy,
                                     lift_queue=lift_queue, schedule=scenario, attendance_log = attendance_log)
 
         helper = SimulationHelper(attendance=simulate.attendance, hotel_lift=hotel, lift_queue=lift_queue, interval=thread_idle,break_enable=False)
