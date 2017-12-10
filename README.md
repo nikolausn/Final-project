@@ -155,6 +155,86 @@ AttendanceName,StartMovingTime,FromFloor,ToFloor,WaitingTime,InLiftTime,TotalSpe
 ```
 
 ## Hypothesis Testing
+The full hypothesis testing can be seen in the Analysis.ipynb jupyter notebook file
+
+# Evacuation Scenario
+## Average Waiting Time
+![alt text](./images/evacuation_average_waiting_time.png "Evacuation Waiting Time")
+
+waiting_time = B0 + B1 * occupancy_percentage
+Our Hypothesis for Average Waiting Time in the Evacuation Scenario:
+- H0 -> B1 = 0 (there is no relation within occupancy percentage and average waiting time)
+- H1 -> B1 != 0
+
+Based on the statistic observation above, we can see that there is linear positive relation between increasing hotel occupancy and average lift waiting time. The linear model can be described by 1.03 + 1.19 * occupancy_percentage, means every increasing value of occupancy percentage the average lift waiting time will be increased by 1.19s.
+
+Furthermore, the p_value for the slope (occupancy_percentage) is close to zero which describes that the linear model is highly significant to correlate occupancy percentage and average waiting time. Therefore, we reject our null hypothesis and accept the hypothesis there is significant positive linear relation within occupancy percentage and average waiting time. 
+## Average In Lift Time
+![alt text](./images/evacuation_in_lift_time.png "Evacuation In Lift Time")
+
+in_lift_time = B0 + B1 * occupancy_percentage
+Our Hypothesis for Average In Lift Time in the Evacuation Scenario:
+- H0 -> B1 = 0 (there is no relation within occupancy percentage and in lift time)
+- H1 -> B1 != 0
+
+Based on the statistic observation above, we can see that there is linear negative relation between increasing hotel occupancy and people stay in the lift while travel. The linear model can be described by 44.4193 - 0.2856 * occupancy_percentage, means every increasing value of occupancy percentage the spend time in lift in the evacuation scenario will be decreased by 0.2856 second.
+
+Furthermore, the p_value for the slope is close to zero for 99% confidence interval,  which describes that the linear model is highly significant to correlate occupancy percentage and in lift time. Therefore, we reject our null hypothesis and accept the hypothesis there is significant negative linear relation within occupancy percentage and in lift time. 
+
+# Batch Registration Scenario
+## Average Waiting Time
+![alt text](./images/batch_reg_waiting_time.png "Batch Registration Waiting Time")
+
+waiting_time = B0 + B1 * occupancy_percentage
+Our Hypothesis for Average Waiting Time in the Batch Registration Scenario:
+- H0 -> B1 = 0 (there is no relation within occupancy percentage and average waiting time)
+- H1 -> B1 != 0
+
+Based on the statistic observation above, we can see that there is linear positive relation between increasing hotel occupancy and average lift waiting time in the batch registration scenario. The linear model can be described by -94.8944 + 5.8757 * occupancy_percentage, means every increasing value of occupancy percentage the average lift waiting time will be increased by 5.8757s.
+
+Furthermore, the p_value for the slope is close to zero which describes that the coefficient is highly significant to associate occupancy percentage and average waiting time. Therefore, we reject our null hypothesis and accept the hypothesis there is significant positive linear relation within occupancy percentage and average waiting time. 
+
+## Average In Lift Time
+![alt text](./images/batch_in_lift_time.png "Batch Registration In Lift Time")
+
+in_lift_time = B0 + B1 * occupancy_percentage
+Our Hypothesis for Average In Lift Time in the Batch Registration Scenario:
+- H0 -> B1 = 0 (there is no relation within occupancy percentage and in lift time)
+- H1 -> B1 != 0
+
+Based on the statistic observation above, we can see that there is linear positvie relation between increasing hotel occupancy and people spend time in the lift while travel. The linear model can be described by 39.0549 + 0.1211 * occupancy_percentage, means every increasing value of occupancy percentage the spend time in lift in the evacuation scenario will be increasing by 0.1211 second.
+
+Furthermore, the p_value for the coefficient is 0.024 which is less than 0.05 for 95% confidence level. This describes that the coefficient is significant to correlate the occupancy percentage and in lift_time. Therefore, we reject our null hypothesis and accept the hypothesis there is positive linear relation within occupancy percentage and in lift time.
+
+# Normal Schedule Scenario
+## Average Waiting Time
+![alt text](./images/normal_waiting_time.png "Normal Schedule Waiting Time")
+
+waiting_time = B0 + B1 * occupancy_percentage
+Our Hypothesis for Average Waiting Time in the Normal Schedule Scenario:
+- H0 -> B1 = 0 (there is no relation within occupancy percentage and average waiting time)
+- H1 -> B1 != 0
+
+Based on the statistic observation above, we can see that there is linear positive relation between increasing hotel occupancy and average lift waiting time in the batch registration scenario. The linear model can be described by -22.6013 + 1.3771  * occupancy_percentage, means every increasing value of occupancy percentage the average lift waiting time will be increased by 1.3771 s.
+
+Furthermore, the p_value for the slope is close to zero for 99% confidence level, which describes that the coefficient is highly significant to associate occupancy percentage and average waiting time. Therefore, we reject our null hypothesis and accept the hypothesis that there is significant positive linear relation within occupancy percentage and average waiting time. 
+
+## Average In Lift Time
+![alt text](./images/normal_in_lift_time.png "Normal Schedule In Lift Time")
+
+in_lift_time = B0 + B1 * occupancy_percentage
+Our Hypothesis for Average In Lift Time in the Normal Schedule Scenario:
+- H0 -> B1 = 0 (there is no relation within occupancy percentage and in lift time)
+- H1 -> B1 != 0
+
+Based on the statistic observation above, we can see that there no relation within the occupancy percentage and the In lift time for the normal schedule scenario. Although we can provide a linear model 26.8712 + 0.0120 * occupancy_percentage, the p_value for the slope is 0.693 which is higher than 0.05 (for 95% confidence interval).
+
+Therefore for the in lift time in normal schedule scenario, we accept our null hypothesis and state that there is no significant relation within occupancy percentage and people spending time in lift
+
+# Conclusion and Feature Work
+In this project we can build a monte carlo simulation for the hotel lift. The simulation is highly configurable in which we can determine the variable and parameters for the hotel lift simulation freely. The program will generate data from the particular configuration scenario that we have determined before (evacuation, batch_registration, and normal schedule) with different hotel rooms occupancy. The data then analyzed further using the exploratory analysis and hypothesis testing.
+
+In the future, we can elaborate the simulation code by projecting the real time data (weekly, daily, or hourly specific schedule). Next, we can also build the animation for the simulation process to better see the process. Finally we can also include different lift queue processing to determine which lift queue algorithm that is better to handle specific case.
 
 
 ## Sources Used:
