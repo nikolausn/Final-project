@@ -47,16 +47,111 @@ There are several variables I used for the uncertainty:
 - assigned_schedule: attendances will be randomly assigned to a room and specific schedule according to the configuration file. To understand about the configuration more, look at the instructions on how to use the program
 
 ## Instructions on how to use the program:
-To use the program we can just run the script hotel_lift_monte_carlo.py and it will run the simulation using the parameter in the code (for now, and might be stored in a config file later). The program itself run in a thread, and right now it will run forever until you pause the program using Command button (in mac), or push a control-C to stop the code. The program will produce a statistic file named results.txt which is described as this example
+To use the program, firstly we need to create a configuration file that contains parameter for the simulation, the sample scenario for normal schedule is given below
+```
+{
+  "number_of_floor": 20,
+  "lift_floor_configuration": {
+    "0": {
+      "floor": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      "speed": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    },
+    "1": {
+      "floor": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      "speed": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    },
+    "2": {
+      "floor": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      "speed": [1, 1, 1, 1, 1, 1, 1, 1, 1]
+    },
+    "3": {
+      "floor": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      "speed": [1, 1, 1, 1, 1, 1, 1, 1, 1]
+    },
+    "4": {
+      "floor": [0, 1, 2, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      "speed": [1, 1, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    },
+    "5": {
+      "floor": [0, 1, 2, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      "speed": [1, 1, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    }
+  },
+  "room_types_capacity": {"single": 2, "double": 2, "deluxe": 4},
+  "rooms_floor_count": {"single": 20, "double": 20, "deluxe": 10},
+  "scenario": [[[["room", 500], ["outside", 700], ["dining", 900], ["room", 0]], 0.5],
+    [[["outside", 900], ["dining", 400], ["room", 0]], 0.3],
+    [[["room", 400], ["dining", 900], ["conference", 300], ["room", 0]], 0.2]],
+  "simulation_list": [[10, 0.1], [20, 0.2], [30, 0.3], [40, 0.4], [50, 0.5], [60, 0.6], [70, 0.7], [80, 0.8], [90, 0.9], [100, 1]],
+  "attendance_log_name": "normal_attendance_{}.log",
+  "lift_log_name": "normal_all_lift_{}.log",
+  "thread_idle": 0.01,
+  "iteration": 1}
+```
+with description as follow:
+- number_of_floor: how many floors that we want to simulate
+- lift_floor_configuration: is a dictionary containing configuration for a particular lift. For example:
+```
+"4": {
+      "floor": [0, 1, 2, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      "speed": [1, 1, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    },
+```
+This will create a lift named "4" which serve the 0,1,2,10-19 floors and speed, 1 second for 0 to 1 and 1 to 2, and 7 seconds for 2-10 floor
+- room_types_capacity: definition of room and their capacity (max attendance per room), for example:
+```
+  "room_types_capacity": {"single": 2, "double": 2, "deluxe": 4},
+```
+  means that single has 2 max attendance, double: 2 max attendance and deluxe 4 maximum attendance. However, the number of attendance each room will be randomly determined using gaussian distribution skewed right.
+- rooms_floor_count: description of how many rooms for each floor, these rooms will be assigned for each floor according to number of floor configuration. For example:
+```
+"rooms_floor_count": {"single": 20, "double": 20, "deluxe": 10},
+```
+means that a floor will have 20 single room, 20 double room and 10 deluxe room
+- scenario: scenario of people moving in the hotel and using the elevators. The scenario will contain the list of position with existing position and target position in the next element, and the waiting time which will be distributed using gaussian distribution. Furthermore, the percentage of people using this schedule will be determine in the second element of a schedule list. For example:
+```
+  "scenario": [[[["room", 500], ["outside", 700], ["dining", 900], ["room", 0]], 0.5],
+    [[["outside", 900], ["dining", 400], ["room", 0]], 0.3],
+    [[["room", 400], ["dining", 900], ["conference", 300], ["room", 0]], 0.2]],
+```
+this scheduler contains three scheduled scenarios, first people moving from the room to outside (500s waiting time) , outside to dining (700s waiting time), dining to the room (900s waiting time). This schedule will be used by 50% population of the attendance (randomly). and followed by the second schedule 30% population, and third schedule 20% population
+-  simulation_list: contains a list of list which descibed as the name in the first element and the percentage of occupancy in the second element. For example:
+```
+  "simulation_list": [[10, 0.1], [20, 0.2], [30, 0.3], [40, 0.4], [50, 0.5], [60, 0.6], [70, 0.7], [80, 0.8], [90, 0.9], [100, 1]],
+```
+means that for the simulation we will run 10 occupancy scenarios from 10% to 100%
+- attendance_log_name: the log name for the attendance log, use the curly bracket for the template name from the simulation list. For example:
+```
+"attendance_log_name": "normal_attendance_{}.log",
+```
+- lift_log_name: the log name for the lift log, use the curly bracket for the template name from the simulation list. For example:
+```
+"lift_log_name": "normal_all_lift_{}.log",
+```
+- thread_idle: the interval for the second granularity in the simulation. For example
+```
+"thread_idle": 0.01,
+```
+means that each second will be simulated for every 0.01s real time speed
+
+After we define the scenario file we can run the program by using
+```
+python hotel_lift_monte_carlo.py -c <configuration_file>
+```
+The program will read the configuration file and produce the attendance log file with like this example below
 
 ```
-AttendanceName,FromFloor,ToFloor,WaitingTime,InLiftTime,TotalSpendTime
-984,17,0,40,38,78
-1051,17,0,14,38,52
-1135,14,0,13,29,42
-1136,14,0,72,29,101
-1154,14,0,32,29,61
-1248,14,0,1,24,25
+AttendanceName,StartMovingTime,FromFloor,ToFloor,WaitingTime,InLiftTime,TotalSpendTime
+485,1,24,1,0,4,19,23
+1390,5,24,1,0,1,18,19
+667,17,31,0,2,7,7,14
+234,9,31,0,2,15,7,22
+760,18,31,0,2,7,6,13
+596,9,31,0,2,17,5,22
+643,2,31,0,2,22,7,29
+582,8,31,0,2,17,6,23
+1019,8,34,2,0,10,16,26
+122,1,34,5,0,8,25,33
 ```
 
 ## Hypothesis Testing
