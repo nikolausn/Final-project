@@ -231,7 +231,7 @@ Based on the statistic observation above, we can see that there no relation with
 
 Therefore for the in lift time in normal schedule scenario, we accept our null hypothesis and state that there is no significant relation within occupancy percentage and people spending time in lift
 
-# Conclustion and Feature Work
+# Conclusion and Feature Work
 In this project we can build a monte carlo simulation for the hotel lift. The simulation is highly configurable in which we can determine the variable and parameters for the hotel lift simulation freely. The program will generate data from the particular configuration scenario that we have determined before (evacuation, batch_registration, and normal schedule) with different hotel rooms occupancy. The data then analyzed further using the exploratory analysis and hypothesis testing.
 
 In the future, we can elaborate the simulation code by projecting the real time data (weekly, daily, or hourly specific schedule). Next, we can also build the animation for the simulation process to better see the process. Finally we can also include different lift queue processing to determine which lift queue algorithm that is better to handle specific case.
