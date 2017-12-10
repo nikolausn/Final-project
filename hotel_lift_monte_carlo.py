@@ -1453,6 +1453,7 @@ if __name__ == '__main__':
     if len(sys.argv) == 1:
         # print help if the configuration file is not presented
         parser.print_help()
+        print("To run the program call: python hotel_lift_monte_carlo.py -c <config_file>")
         sys.exit(1)
 
     log_key = {
