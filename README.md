@@ -46,6 +46,21 @@ There are several variables I used for the uncertainty:
 - door_closing_time: every time a lift door open in a floor, it has generated random waiting time to wait for another guest to get into the lift. This random waiting time is useful to simulate people behavior in a lift. People often push the close door button to close the lift immediately or just leave it closed automatically (maximum time). This variable is generated using normal Gaussian distribution with half of the maximum time as the mean. For this parameter, I used 10 seconds for the maximum door closing time
 - assigned_schedule: attendances will be randomly assigned to a room and specific schedule according to the configuration file. To understand about the configuration more, look at the instructions on how to use the program
 
+## Requirements:
+Simulation
+- numpy
+- networkx
+- random
+- pynput
+- threading
+- typing
+
+Analyisis:
+- panda
+- matplotlib
+- numpy
+- statsmodel
+
 ## Instructions on how to use the program:
 To use the program, firstly we need to create a configuration file that contains parameter for the simulation, the sample scenario for normal schedule is given below
 ```
