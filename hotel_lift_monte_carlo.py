@@ -702,6 +702,21 @@ class HotelLift():
     """
     HotelLift
     is a class that combining the HotelFloor and the Lift, it also can be called as a simple hotel class
+    >>> room_types = { 'normal' : RoomType('normal',2), 'deluxe': RoomType('deluxe', 4)}
+    >>> rooms_floor_count = {'normal': 10, 'deluxe': 5}
+    >>> number_of_floor = 3
+
+    >>> lift_floor_configuration = { \
+    0: {"floor": [0,1,2], "speed": [1,1]}, \
+    1: {"floor": [0,1,2], "speed": [1,1]} \
+    }
+    >>> hotel = HotelLift(number_of_floor, lift_floor_configuration, rooms_floor_count, room_types, lift_log = "lift-doctest.log")
+    >>> print(hotel)
+    Lift 0, capacity: 20, attendance: 0, position: 0, imm: , next_move: idle, serve: 0,1,2
+    Lift 1, capacity: 20, attendance: 0, position: 0, imm: , next_move: idle, serve: 0,1,2
+    <BLANKLINE>
+    >>> hotel.total_capacity
+    120
     """
 
     def __init__(self, number_of_floor: int, lift_floor_configuration: dict, rooms_floor_count, room_types: dict,
@@ -815,6 +830,24 @@ class HotelLift():
 class HotelLiftQueue():
     """
     Helper class for a lift queue
+    >>> room_types = { 'normal' : RoomType('normal',2), 'deluxe': RoomType('deluxe', 4)}
+    >>> rooms_floor_count = {'normal': 10, 'deluxe': 5}
+    >>> number_of_floor = 3
+
+    >>> lift_floor_configuration = { \
+    0: {"floor": [0,1,2], "speed": [1,1]}, \
+    1: {"floor": [0,1,2], "speed": [1,1]} \
+    }
+    >>> hotel = HotelLift(number_of_floor, lift_floor_configuration, rooms_floor_count, room_types, lift_log = "lift-doctest.log")
+    >>> hotel_lift_queue = HotelLiftQueue(hotel)
+    >>> attendance_1 = Attendance(hotel.rooms[0],name="attendance_1",lift_queue=hotel_lift_queue,schedule=[["room", 300], ["outside", 0]],attendance_log="attendance-doctest.log")
+    >>> attendance_2 = Attendance(hotel.rooms[10],name="attendance_2",lift_queue=hotel_lift_queue,schedule=[["room", 300], ["outside", 0]],attendance_log="attendance-doctest.log")
+    >>> hotel_lift_queue.call_lift_priority(attendance_1,2,0)
+    >>> hotel_lift_queue.call_lift_priority(attendance_2,0,2)
+    >>> hotel.floors[2].lift_queue_down
+    [name: attendance_1, room: Room 00, Type: normal, Capacity: 2, Status: empty]
+    >>> hotel.floors[0].lift_queue_up
+    [name: attendance_2, room: Room 010, Type: deluxe, Capacity: 4, Status: empty]
     """
 
     def __init__(self, hotel_lift: HotelLift):
@@ -921,6 +954,12 @@ class HotelLiftQueue():
 class Person():
     """
     Base class for the Attendance
+    >>> person_1 = Person("Nikolaus",1)
+    >>> person_1
+    name: Nikolaus, capacity: 1
+    >>> person_2 = Person("Parulian",5)
+    >>> person_2
+    name: Parulian, capacity: 5
     """
 
     def __init__(self, name: str, capacity_unit=1):
@@ -947,11 +986,32 @@ class Person():
     def name(self):
         return self._name
 
+    def __repr__(self):
+        return "name: {}, capacity: {}".format(self.name,self.capacity_unit)
+
 
 class Attendance(Person):
     """
     Attendance of the hotel
     This class will have all methods that can be performed for one attendance
+    >>> room_types = { 'normal' : RoomType('normal',2), 'deluxe': RoomType('deluxe', 4)}
+    >>> rooms_floor_count = {'normal': 10, 'deluxe': 5}
+    >>> number_of_floor = 3
+
+    >>> lift_floor_configuration = { \
+    0: {"floor": [0,1,2], "speed": [1,1]}, \
+    1: {"floor": [0,1,2], "speed": [1,1]} \
+    }
+    >>> hotel = HotelLift(number_of_floor, lift_floor_configuration, rooms_floor_count, room_types, lift_log = "lift-doctest.log")
+    >>> hotel_lift_queue = HotelLiftQueue(hotel)
+    >>> attendance_1 = Attendance(hotel.rooms[0],name="attendance_1",lift_queue=hotel_lift_queue,schedule=[["room", 300], ["outside", 0]],attendance_log="attendance-doctest.log")
+    >>> attendance_1.schedule_queue
+    [['room', 300], ['outside', 0]]
+    >>> attendance_1.moving_path
+    []
+    >>> attendance_1.perform_move(time_tick=1)
+    >>> attendance_1.moving_path
+    ['room', 'waiting_lift', 'in_lift', 'outside']
     """
     _target_dest = ["room", "outside", "conference", "dining"]
     _status = ["idle", "go_lift", "waiting_lift", "in_lift", "on_move"]
@@ -1063,6 +1123,10 @@ class Attendance(Person):
     @property
     def schedule_queue(self):
         return self._schedule_queue
+
+    @property
+    def moving_path(self):
+        return self._moving_path
 
     def perform_move(self,time_tick:int):
         """
@@ -1177,7 +1241,7 @@ class Attendance(Person):
         might include the move that are assigned in the schedule
         :return:
         """
-        # print(self._schedule_queue)
+        #print(len(self._schedule_queue))
         if len(self._schedule) > 0:
             if len(self._schedule_queue) > 1:
                 action_now = self._schedule_queue.pop(0)
@@ -1226,6 +1290,25 @@ class Attendance(Person):
 class InitialGenerator():
     """
     InitialGenerator is a class to generate random attendance
+    >>> room_types = { 'normal' : RoomType('normal',2), 'deluxe': RoomType('deluxe', 4)}
+    >>> rooms_floor_count = {'normal': 10, 'deluxe': 5}
+    >>> number_of_floor = 3
+
+    >>> lift_floor_configuration = { \
+    0: {"floor": [0,1,2], "speed": [1,1]}, \
+    1: {"floor": [0,1,2], "speed": [1,1]} \
+    }
+    >>> scenario = [[[["room", 300], ["outside", 0]], 0.5],\
+    [[["outside", 900], ["room", 0]], 0.5]]
+    >>> room_occupancy = 0.2
+    >>> hotel = HotelLift(number_of_floor, lift_floor_configuration, rooms_floor_count, room_types, lift_log = "lift-doctest.log")
+    >>> hotel_lift_queue = HotelLiftQueue(hotel)
+    >>> simulate = InitialGenerator(room_stack=hotel.rooms, room_occupancy_pctg=room_occupancy,\
+                                    lift_queue=hotel_lift_queue, schedule=scenario, attendance_log = "attendance-doctest.log")
+    >>> simulate.number_of_attendance > 0
+    True
+    >>> simulate.room_stack # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+    [Room 00, ...]
     """
 
     def __init__(self, room_stack: list, room_occupancy_pctg: float,
